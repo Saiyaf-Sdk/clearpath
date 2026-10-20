@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="ClearPath – one online request to get cleared by every university department, with a QR-verified clearance certificate." />
+    <meta name="theme-color" content="#4f46e5" />
+    <title>ClearPath – University Digital Clearance System</title>
+    <script>
+      // Apply the saved theme before anything paints (prevents a white flash)
+      try {
+        var t = localStorage.getItem('cp_theme');
+        if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    </script>
+    <style>
+      /* Shown instantly while the JavaScript downloads – just the page colour, so there is never a white flash.
+         The animated loading screen then plays on top of it. */
+      #boot { position: fixed; inset: 0; z-index: 9999; background: #f7f8fb; }
+      [data-theme='dark'] #boot { background: #0a0f1c; }
+    </style>
+  </head>
+  <body>
+    <div id="boot" aria-hidden="true"></div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
