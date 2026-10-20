@@ -27,8 +27,9 @@ const emailBelongsTo = (email, university) => {
 const publicUniversity = (u) =>
   u && { id: u._id, name: u.name, shortName: u.shortName || u.name, code: u.code, domains: u.domains, logoUrl: u.logoUrl || null, website: u.website };
 
-// Show codes/links on screen only in local development without email configured
-const devMode = () => process.env.NODE_ENV !== 'production' && !process.env.SMTP_HOST;
+// Show codes/links on screen only when no email is configured AND we are in local development
+// (or DEMO_MODE=true is set explicitly for a project demonstration)
+const devMode = () => !process.env.SMTP_HOST && (process.env.NODE_ENV !== 'production' || process.env.DEMO_MODE === 'true');
 
 const maskEmail = (email) => {
   const [user, domain] = String(email).split('@');

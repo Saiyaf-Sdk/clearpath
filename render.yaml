@@ -1,0 +1,32 @@
+# Render Blueprint – one web service that runs the API and serves the React app.
+# Render → New → Blueprint → pick this repository. You only need to paste MONGO_URI.
+services:
+  - type: web
+    name: clearpath
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        sync: false # paste your MongoDB Atlas connection string in the Render dashboard
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: APP_TIMEZONE
+        value: Asia/Colombo
+      # For the project demonstration: show the demo-account panel on the login page,
+      # and show registration codes / reset links on screen while no email (SMTP) is set up.
+      # Set both to "false" for a real deployment.
+      - key: VITE_SHOW_DEMO
+        value: "true"
+      - key: DEMO_MODE
+        value: "true"

@@ -4,7 +4,7 @@ import { API_URL } from '../api';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   BedDouble, BookOpen, Building2, CircleCheck, CircleX, Clock, FileUp, FlaskConical, Hourglass, Landmark,
-  LoaderCircle, Receipt, TriangleAlert, Trophy, Users, X,
+  LoaderCircle, Receipt, Search, TriangleAlert, Trophy, Users, X,
 } from 'lucide-react';
 
 /* ---------- formatting ---------- */
@@ -312,5 +312,186 @@ export function UniLogo({ university, size = 36 }) {
     <span className={`uni-logo ${src ? 'has-img' : ''}`} style={{ width: size, height: size, fontSize: Math.max(9, size * 0.28) }} title={university.name}>
       {src ? <img src={src} alt={`${university.name} logo`} onError={() => setBroken(true)} /> : initialsOf(university)}
     </span>
+  );
+}
+
+/* ---------- more formatting ---------- */
+export const initials = (name = '') => name.split(' ').filter(Boolean).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
+export const fmtDateTime = (d) =>
+  d ? new Date(d).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+export const timeAgo = (d) => {
+  if (!d) return '';
+  const s = Math.round((Date.now() - new Date(d).getTime()) / 1000);
+  if (s < 45) return 'just now';
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} hour${h > 1 ? 's' : ''} ago`;
+  const days = Math.round(h / 24);
+  if (days < 30) return `${days} day${days > 1 ? 's' : ''} ago`;
+  return fmtDate(d);
+};
+export const daysSince = (d) => Math.max(0, Math.floor((Date.now() - new Date(d).getTime()) / 864e5));
+export const shortDay = (key) => new Date(`${key}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+
+/* ---------- page header ---------- */
+export function PageHeader({ title, subtitle, eyebrow, icon: Icon, actions, children }) {
+  return (
+    <div className="ph">
+      <div className="ph-main">
+        {Icon && <span className="ph-icon"><Icon size={22} /></span>}
+        <div>
+          {eyebrow && <span className="eyebrow">{eyebrow}</span>}
+          <h1>{title}</h1>
+          {subtitle && <p className="muted">{subtitle}</p>}
+          {children}
+        </div>
+      </div>
+      {actions && <div className="ph-actions">{actions}</div>}
+    </div>
+  );
+}
+
+/* ---------- small building blocks ---------- */
+export function Avatar({ name, size }) {
+  return <span className="avatar" style={size ? { width: size, height: size, fontSize: size * 0.36 } : undefined}>{initials(name)}</span>;
+}
+
+export function Person({ name, sub }) {
+  return (
+    <div className="person">
+      <Avatar name={name} />
+      <div><strong>{name || '—'}</strong>{sub && <small>{sub}</small>}</div>
+    </div>
+  );
+}
+
+export function MiniProgress({ value = 0, total = 0 }) {
+  const pct = total ? Math.round((value / total) * 100) : 0;
+  return (
+    <div className="mini-progress" title={`${value} of ${total} cleared`}>
+      <div className="mini-track"><span style={{ width: `${pct}%` }} className={pct === 100 ? 'done' : ''} /></div>
+      <small>{value}/{total}</small>
+    </div>
+  );
+}
+
+export function Pager({ page, pages, total, onPage, label = 'items' }) {
+  if (pages <= 1) return total ? <div className="pager"><span className="muted small">{total} {label}</span></div> : null;
+  return (
+    <div className="pager">
+      <span className="muted small">Page {page} of {pages} · {total} {label}</span>
+      <div className="row-gap">
+        <button className="btn btn-ghost btn-sm" disabled={page <= 1} onClick={() => onPage(page - 1)}>Previous</button>
+        <button className="btn btn-ghost btn-sm" disabled={page >= pages} onClick={() => onPage(page + 1)}>Next</button>
+      </div>
+    </div>
+  );
+}
+
+export function SearchInput({ value, onChange, placeholder = 'Search…', delay = 300 }) {
+  const [text, setText] = useState(value || '');
+  const first = useRef(true);
+  useEffect(() => setText(value || ''), [value]);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return undefined;
+    }
+    const t = setTimeout(() => { if (text !== (value || '')) onChange(text); }, delay);
+    return () => clearTimeout(t);
+  }, [text]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="search-box">
+      <Search size={16} />
+      <input className="input" placeholder={placeholder} value={text} onChange={(e) => setText(e.target.value)} aria-label={placeholder} />
+      {text && <button type="button" className="search-clear" onClick={() => { setText(''); onChange(''); }} aria-label="Clear search"><X size={14} /></button>}
+    </div>
+  );
+}
+
+export function ErrorState({ message, onRetry }) {
+  return (
+    <div className="card error-state">
+      <TriangleAlert size={22} />
+      <div>
+        <strong>Couldn't load this data</strong>
+        <p className="muted small">{message}</p>
+      </div>
+      {onRetry && <button className="btn btn-ghost btn-sm" onClick={onRetry}>Try again</button>}
+    </div>
+  );
+}
+
+/* ---------- CSV export ---------- */
+export function downloadCsv(filename, rows) {
+  const esc = (v) => {
+    const s = v === null || v === undefined ? '' : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const csv = rows.map((r) => r.map(esc).join(',')).join('\r\n');
+  const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/* ---------- audit log wording ---------- */
+const ACTIONS = {
+  CLEARANCE_SUBMITTED: ['Submitted a clearance request', 'brand'],
+  CLEARANCE_CANCELLED: ['Cancelled a request', 'muted'],
+  CLEARANCE_CLEARED: ['Cleared a student', 'good'],
+  CLEARANCE_FLAGGED: ['Flagged dues', 'warn'],
+  CERTIFICATE_ISSUED: ['Certificate issued', 'good'],
+  DUE_ADDED: ['Added a due', 'warn'],
+  DUE_PAID: ['Marked a due as paid', 'good'],
+  DUE_WAIVED: ['Waived a due', 'good'],
+  DUE_UNPAID: ['Rejected a receipt', 'bad'],
+  DUE_DELETED: ['Deleted a due', 'muted'],
+  RECEIPT_UPLOADED: ['Uploaded a receipt', 'brand'],
+  STUDENT_REGISTERED: ['Created an account', 'brand'],
+  PASSWORD_CHANGED: ['Changed password', 'muted'],
+  PASSWORD_RESET_REQUESTED: ['Requested a password reset', 'muted'],
+  PASSWORD_RESET_COMPLETED: ['Reset password', 'muted'],
+  USER_CREATED: ['Created a user', 'brand'],
+  USER_UPDATED: ['Updated a user', 'muted'],
+  USER_DELETED: ['Deleted a user', 'bad'],
+  DEPARTMENT_CREATED: ['Added a department', 'brand'],
+  DEPARTMENT_UPDATED: ['Updated a department', 'muted'],
+  DEPARTMENT_DELETED: ['Deleted a department', 'bad'],
+  ROSTER_ADDED: ['Added a student to the list', 'brand'],
+  ROSTER_IMPORTED: ['Imported the student list', 'brand'],
+  ROSTER_REMOVED: ['Removed a student from the list', 'muted'],
+  UNIVERSITY_CREATED: ['Added a university', 'brand'],
+  UNIVERSITY_UPDATED: ['Updated a university', 'muted'],
+  UNIVERSITY_LOGO_UPDATED: ['Uploaded a university logo', 'brand'],
+  UNIVERSITY_LOGO_REMOVED: ['Removed a university logo', 'muted'],
+  UNIVERSITY_ADMIN_CREATED: ['Added a university admin', 'brand'],
+};
+export const actionLabel = (a) => ACTIONS[a]?.[0] || cap(String(a || '').toLowerCase().replace(/_/g, ' '));
+export const actionTone = (a) => ACTIONS[a]?.[1] || 'muted';
+
+export function ActivityList({ items, empty = 'No activity yet', showActor = true }) {
+  if (!items?.length) return <p className="muted small" style={{ padding: '8px 0' }}>{empty}</p>;
+  return (
+    <ul className="activity">
+      {items.map((l) => (
+        <li key={l._id}>
+          <span className={`act-dot t-${actionTone(l.action)}`} />
+          <div>
+            <div className="act-line">
+              {showActor && <strong>{l.actor?.name || 'System'}</strong>}
+              <span>{showActor ? actionLabel(l.action).replace(/^./, (c) => c.toLowerCase()) : actionLabel(l.action)}</span>
+            </div>
+            {l.details && <div className="act-details">{l.details}</div>}
+            <small className="muted" title={fmtDateTime(l.createdAt)}>{timeAgo(l.createdAt)}</small>
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }

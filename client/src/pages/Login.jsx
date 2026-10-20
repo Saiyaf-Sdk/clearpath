@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { AnimatePresence, motion, useIsPresent } from 'framer-motion';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { ArrowRight, ChevronDown, CircleAlert, Eye, EyeOff, FlaskConical, Lock, Mail } from 'lucide-react';
-import { homeFor, useAuth } from '../context/AuthContext';
+import { canVisit, homeFor, useAuth } from '../context/AuthContext';
 import { errMsg } from '../api';
 import { Field, Spin } from '../components/ui';
 import AuthLayout, { FormError } from '../components/AuthLayout';
@@ -13,7 +13,9 @@ import PortalBanner, { useUniversityFor } from '../components/PortalBanner';
 // (e.g. for the project evaluation). They never appear on a normal live deployment.
 const SHOW_DEMO = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEMO === 'true';
 const DEMO = [
-  ['Ruhuna · student', 'demo.kasun@ruh.ac.lk'],
+  ['Ruhuna · student (in progress)', 'demo.kasun@ruh.ac.lk'],
+  ['Ruhuna · student (certificate)', 'demo.nimali@ruh.ac.lk'],
+  ['Ruhuna · student (no request yet)', 'demo.tharindu@ruh.ac.lk'],
   ['Ruhuna · library officer', 'demo.lib@ruh.ac.lk'],
   ['Ruhuna · admin', 'demo.admin@ruh.ac.lk'],
   ['Colombo · student', 'demo.saman@cmb.ac.lk'],
@@ -24,6 +26,10 @@ const DEMO = [
 export default function Login() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  // After logging in, go back to the page that asked for it (if it belongs to this role)
+  const from = location.state?.from;
+  const target = (u) => (canVisit(u.role, from) ? from : homeFor(u.role));
   const [form, setForm] = useState({ email: '', password: '' });
   const [remember, setRemember] = useState(true);
   const [show, setShow] = useState(false);
@@ -33,8 +39,7 @@ export default function Login() {
   const [demoOpen, setDemoOpen] = useState(false);
   const portal = useUniversityFor(form.email);
 
-  const isPresent = useIsPresent();
-  if (user && isPresent) return <Navigate to={homeFor(user.role)} replace />;
+  if (user) return <Navigate to={target(user)} replace />;
 
   const submit = async (e) => {
     e.preventDefault();
@@ -43,7 +48,7 @@ export default function Login() {
     try {
       const u = await login(form.email, form.password, remember);
       toast.success(`Welcome back, ${u.name.split(' ')[0]}`);
-      navigate(homeFor(u.role));
+      navigate(target(u), { replace: true });
     } catch (err) {
       setError(errMsg(err));
       setShake((s) => s + 1);

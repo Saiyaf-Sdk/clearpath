@@ -3,11 +3,10 @@ const User = require('../models/User');
 const EnrolledStudent = require('../models/EnrolledStudent');
 const { universityForEmail, publicUniversity, devMode, maskEmail } = require('../utils/policy');
 const { asyncHandler, ApiError } = require('../middleware/error');
-const { signToken, audit } = require('../utils/helpers');
+const { signToken, audit, appUrl } = require('../utils/helpers');
 const { sendMail } = require('../utils/mailer');
 
 const sha256 = (v) => crypto.createHash('sha256').update(v).digest('hex');
-const clientUrl = () => (process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0].trim();
 
 const publicUser = (u) => ({
   id: u._id,
@@ -136,7 +135,7 @@ exports.login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) throw new ApiError(400, 'Email and password are required');
 
-  const user = await User.findOne({ email: email.toLowerCase() })
+  const user = await User.findOne({ email: String(email).toLowerCase().trim() })
     .select('+password')
     .populate('department', 'name code')
     .populate('university');
@@ -154,6 +153,24 @@ exports.me = asyncHandler(async (req, res) => {
   res.json({ user: publicUser(req.user) });
 });
 
+// PATCH /api/auth/me  body: { name, phone }  – students' names come from the official list
+exports.updateProfile = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  if (req.body.phone !== undefined) {
+    const phone = String(req.body.phone || '').trim();
+    if (phone && !/^[+\d][\d\s-]{6,18}$/.test(phone)) throw new ApiError(400, 'Please enter a valid phone number');
+    user.phone = phone || undefined;
+  }
+  if (req.body.name !== undefined && user.role !== 'student') {
+    const name = String(req.body.name || '').trim();
+    if (name.length < 2) throw new ApiError(400, 'Please enter your name');
+    user.name = name;
+  }
+  await user.save();
+  const full = await User.findById(user._id).populate('department', 'name code').populate('university');
+  res.json({ user: publicUser(full) });
+});
+
 // PATCH /api/auth/password
 exports.changePassword = asyncHandler(async (req, res) => {
   const { currentPassword, newPassword } = req.body;
@@ -162,6 +179,7 @@ exports.changePassword = asyncHandler(async (req, res) => {
   if (!(await user.matchPassword(currentPassword || ''))) throw new ApiError(400, 'Current password is incorrect');
   user.password = newPassword;
   await user.save();
+  await audit(req.user, 'PASSWORD_CHANGED', user._id);
   res.json({ message: 'Password updated' });
 });
 
@@ -180,7 +198,7 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
     user.resetPasswordExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
     await user.save({ validateBeforeSave: false });
 
-    const url = `${clientUrl()}/reset-password/${raw}`;
+    const url = `${appUrl(req)}/reset-password/${raw}`;
     await sendMail(
       user.email,
       'ClearPath: Reset your password',

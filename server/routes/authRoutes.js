@@ -10,6 +10,7 @@ router.post('/forgot-password', c.forgotPassword);
 router.get('/reset-password/:token', c.checkResetToken);
 router.post('/reset-password/:token', c.resetPassword);
 router.get('/me', protect, c.me);
+router.patch('/me', protect, c.updateProfile);
 router.patch('/password', protect, c.changePassword);
 
 module.exports = router;

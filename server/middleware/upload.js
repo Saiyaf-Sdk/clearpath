@@ -1,46 +1,36 @@
 const path = require('path');
-const crypto = require('crypto');
 const multer = require('multer');
 const { ApiError } = require('./error');
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, path.join(__dirname, '..', 'uploads')),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `receipt-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`);
-  },
-});
+// Files are kept in memory and then saved to MongoDB (see utils/files.js), so uploads
+// survive restarts on hosting platforms with a temporary disk.
+const storage = multer.memoryStorage();
 
-const allowed = ['.jpg', '.jpeg', '.png', '.pdf'];
+const RECEIPT_TYPES = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.pdf': 'application/pdf' };
+const LOGO_TYPES = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png' };
 
+const filter = (types, message) => (req, file, cb) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (!types[ext]) return cb(new ApiError(400, message));
+  // Trust the extension check, not the browser's claimed type
+  file.mimetype = types[ext];
+  cb(null, true);
+};
+
+// Payment receipts: JPG, PNG or PDF, max 3 MB
 const upload = multer({
   storage,
-  limits: { fileSize: 3 * 1024 * 1024 }, // 3 MB
-  fileFilter: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (!allowed.includes(ext)) return cb(new ApiError(400, 'Only JPG, PNG or PDF files are allowed'));
-    cb(null, true);
-  },
+  defParamCharset: 'utf8', // keep Sinhala / Tamil file names readable
+  limits: { fileSize: 3 * 1024 * 1024, files: 1 },
+  fileFilter: filter(RECEIPT_TYPES, 'Only JPG, PNG or PDF files are allowed'),
 });
 
 module.exports = upload;
 
 // University logos (platform admin): PNG or JPG, max 1 MB – these formats also work in the PDF certificate
-const logoDir = path.join(__dirname, '..', 'uploads', 'logos');
-const logoUpload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => {
-      require('fs').mkdirSync(logoDir, { recursive: true });
-      cb(null, logoDir);
-    },
-    filename: (req, file, cb) => cb(null, `logo-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${path.extname(file.originalname).toLowerCase()}`),
-  }),
-  limits: { fileSize: 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (!['.png', '.jpg', '.jpeg'].includes(ext)) return cb(new ApiError(400, 'Logo must be a PNG or JPG file'));
-    cb(null, true);
-  },
+module.exports.logoUpload = multer({
+  storage,
+  defParamCharset: 'utf8',
+  limits: { fileSize: 1024 * 1024, files: 1 },
+  fileFilter: filter(LOGO_TYPES, 'Logo must be a PNG or JPG file'),
 });
-
-module.exports.logoUpload = logoUpload;

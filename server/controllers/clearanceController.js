@@ -3,23 +3,29 @@ const Department = require('../models/Department');
 const Due = require('../models/Due');
 const Certificate = require('../models/Certificate');
 const { asyncHandler, ApiError } = require('../middleware/error');
-const { audit, issueCertificate } = require('../utils/helpers');
+const { audit, notify, notifyOfficers, issueCertificate } = require('../utils/helpers');
 const { uniOf } = require('../middleware/auth');
 const { sendMail } = require('../utils/mailer');
 
 const OPEN_DUE = ['unpaid', 'receipt-submitted'];
+const REASONS = ['graduation', 'transfer', 'withdrawal', 'other'];
 
 const populateRequest = (q) =>
-  q.populate('student', 'name email regNo faculty').populate('items.department', 'name code order');
+  q.populate('student', 'name email regNo faculty').populate('items.department', 'name code order').populate('items.actionedBy', 'name');
+
+const progressOf = (items = []) => ({
+  total: items.length,
+  cleared: items.filter((i) => i.status === 'cleared').length,
+  dues: items.filter((i) => i.status === 'dues').length,
+});
 
 // POST /api/clearances  (student)
 exports.createRequest = asyncHandler(async (req, res) => {
   const { reason, note } = req.body;
+  if (!REASONS.includes(reason)) throw new ApiError(400, 'Please choose a valid reason');
+  if (note && String(note).length > 500) throw new ApiError(400, 'The note can be at most 500 characters');
 
-  const open = await ClearanceRequest.findOne({
-    student: req.user._id,
-    status: { $in: ['pending', 'in-progress'] },
-  });
+  const open = await ClearanceRequest.findOne({ student: req.user._id, status: { $in: ['pending', 'in-progress'] } });
   if (open) throw new ApiError(400, 'You already have an active clearance request');
 
   // Only this student's university's departments take part
@@ -27,24 +33,37 @@ exports.createRequest = asyncHandler(async (req, res) => {
   if (departments.length === 0) throw new ApiError(400, 'No departments are set up yet. Contact the admin.');
 
   // Departments where the student already owes something start as "dues"
-  const owing = await Due.distinct('department', { student: req.user._id, status: { $in: OPEN_DUE } });
-  const owingIds = owing.map(String);
+  const owing = (await Due.distinct('department', { student: req.user._id, status: { $in: OPEN_DUE } })).map(String);
 
-  const request = await ClearanceRequest.create({
+  const request = new ClearanceRequest({
     student: req.user._id,
     university: uniOf(req),
     reason,
     note,
     items: departments.map((d) => ({
       department: d._id,
-      status: owingIds.includes(String(d._id)) ? 'dues' : 'pending',
-      remark: owingIds.includes(String(d._id)) ? 'Outstanding dues found' : undefined,
+      status: owing.includes(String(d._id)) ? 'dues' : 'pending',
+      remark: owing.includes(String(d._id)) ? 'Outstanding dues found' : undefined,
     })),
   });
   request.refreshStatus();
   await request.save();
 
-  await audit(req.user, 'CLEARANCE_SUBMITTED', request._id, `Reason: ${reason}`);
+  await audit(req.user, 'CLEARANCE_SUBMITTED', request._id, `${req.user.regNo || req.user.name} · ${reason}`);
+  await notifyOfficers(departments.map((d) => d._id), {
+    title: 'New clearance request',
+    body: `${req.user.name} (${req.user.regNo || 'student'}) asked for ${reason} clearance.`,
+    link: `/officer/requests?open=${request._id}`,
+    university: uniOf(req),
+  });
+  await notify(req.user, {
+    title: 'Request submitted',
+    body: `Your ${reason} clearance request was sent to ${departments.length} departments.`,
+    link: '/student/clearance',
+    kind: 'success',
+    university: uniOf(req),
+  });
+
   const full = await populateRequest(ClearanceRequest.findById(request._id));
   res.status(201).json(full);
 });
@@ -56,7 +75,7 @@ exports.getMyRequests = asyncHandler(async (req, res) => {
   const result = requests.map((r) => {
     r.items.sort((a, b) => (a.department?.order || 0) - (b.department?.order || 0));
     const cert = certs.find((c) => String(c.request) === String(r._id));
-    return { ...r, certificate: cert ? { certificateNo: cert.certificateNo, issuedAt: cert.issuedAt } : null };
+    return { ...r, progress: progressOf(r.items), certificate: cert ? { certificateNo: cert.certificateNo, issuedAt: cert.issuedAt } : null };
   });
   res.json(result);
 });
@@ -72,15 +91,14 @@ exports.cancelRequest = asyncHandler(async (req, res) => {
   }
   request.status = 'cancelled';
   await request.save();
-  await audit(req.user, 'CLEARANCE_CANCELLED', request._id);
+  await audit(req.user, 'CLEARANCE_CANCELLED', request._id, req.user.regNo || req.user.name);
   res.json({ message: 'Request cancelled' });
 });
 
-// GET /api/clearances/department?status=pending  (officer: own dept, admin: ?department=<id>)
+// GET /api/clearances/department?status=pending&search=abc  (officer: own dept, admin: ?department=<id>)
 exports.getDepartmentRequests = asyncHandler(async (req, res) => {
   const deptId = req.user.role === 'admin' ? req.query.department : req.user.department?._id;
   if (!deptId) throw new ApiError(400, 'No department assigned to this account');
-
   if (!(await Department.exists({ _id: deptId, university: uniOf(req) }))) throw new ApiError(404, 'Department not found');
 
   const itemFilter = { department: deptId };
@@ -91,8 +109,10 @@ exports.getDepartmentRequests = asyncHandler(async (req, res) => {
     status: { $ne: 'cancelled' },
     items: { $elemMatch: itemFilter },
   })
-    .populate('student', 'name email regNo faculty')
+    .populate('student', 'name email regNo faculty phone')
+    .populate('items.department', 'name code order')
     .sort('-createdAt')
+    .limit(500)
     .lean();
 
   // Attach this department's item + the student's dues in this department
@@ -106,7 +126,16 @@ exports.getDepartmentRequests = asyncHandler(async (req, res) => {
     note: r.note,
     overallStatus: r.status,
     createdAt: r.createdAt,
-    item: r.items.find((i) => String(i.department) === String(deptId)),
+    completedAt: r.completedAt,
+    progress: progressOf(r.items),
+    otherDepartments: r.items
+      .filter((i) => String(i.department?._id) !== String(deptId))
+      .sort((a, b) => (a.department?.order || 0) - (b.department?.order || 0))
+      .map((i) => ({ name: i.department?.name, code: i.department?.code, status: i.status })),
+    item: (() => {
+      const it = r.items.find((i) => String(i.department?._id) === String(deptId));
+      return it ? { ...it, department: it.department?._id } : null;
+    })(),
     dues: dues.filter((d) => String(d.student) === String(r.student?._id)),
   }));
   res.json(result);
@@ -115,7 +144,8 @@ exports.getDepartmentRequests = asyncHandler(async (req, res) => {
 // PATCH /api/clearances/:id/items/:deptId  body: { action: 'clear' | 'flag', remark }
 exports.actionItem = asyncHandler(async (req, res) => {
   const { id, deptId } = req.params;
-  const { action, remark } = req.body;
+  const { action } = req.body;
+  const remark = String(req.body.remark || '').trim().slice(0, 300);
   if (!['clear', 'flag'].includes(action)) throw new ApiError(400, 'Action must be "clear" or "flag"');
 
   if (req.user.role === 'officer' && String(req.user.department?._id) !== String(deptId)) {
@@ -129,6 +159,7 @@ exports.actionItem = asyncHandler(async (req, res) => {
 
   const item = request.items.find((i) => String(i.department) === String(deptId));
   if (!item) throw new ApiError(404, 'Department item not found on this request');
+  if (action === 'flag' && !remark) throw new ApiError(400, 'Please tell the student what is outstanding');
 
   if (action === 'clear') {
     const openDues = await Due.countDocuments({ student: request.student._id, department: deptId, status: { $in: OPEN_DUE } });
@@ -146,23 +177,51 @@ exports.actionItem = asyncHandler(async (req, res) => {
   request.refreshStatus();
   await request.save();
 
+  // Two officers may clear the last two departments at the same moment. Each save only
+  // writes its own department's item, so re-read the request and work out the final status
+  // from what is really stored now.
+  const fresh = await ClearanceRequest.findById(request._id);
+  fresh.refreshStatus();
+  if (fresh.isModified()) await fresh.save();
+  request.status = fresh.status;
+
   const dept = await Department.findById(deptId);
-  await audit(req.user, action === 'clear' ? 'CLEARANCE_CLEARED' : 'CLEARANCE_FLAGGED', request._id, `${dept?.name}: ${item.remark}`);
+  const student = request.student;
+  await audit(req.user, action === 'clear' ? 'CLEARANCE_CLEARED' : 'CLEARANCE_FLAGGED', request._id, `${student.regNo} · ${dept?.name}: ${item.remark}`);
+  await notify(student, {
+    title: action === 'clear' ? `${dept?.name} cleared you` : `${dept?.name} flagged an issue`,
+    body: item.remark,
+    link: action === 'clear' ? '/student/clearance' : '/student/dues',
+    kind: action === 'clear' ? 'success' : 'warning',
+    university: request.university,
+  });
   await sendMail(
-    request.student.email,
+    student.email,
     `ClearPath: ${dept?.name} ${action === 'clear' ? 'cleared you' : 'flagged dues'}`,
-    `Hi ${request.student.name},\n\n${dept?.name} has ${action === 'clear' ? 'cleared' : 'flagged'} your clearance request.\nRemark: ${item.remark}\n\nLog in to ClearPath to see details.`
+    `Hi ${student.name},\n\n${dept?.name} has ${action === 'clear' ? 'cleared' : 'flagged'} your clearance request.\nRemark: ${item.remark}\n\nLog in to ClearPath to see details.`
   );
 
+  let certificate = null;
   if (request.status === 'completed') {
-    const cert = await issueCertificate(request, req.user.university?.code);
-    await audit(req.user, 'CERTIFICATE_ISSUED', cert._id, cert.certificateNo);
+    certificate = await issueCertificate(request, req.user.university?.code);
+    await audit(req.user, 'CERTIFICATE_ISSUED', certificate._id, `${student.regNo} · ${certificate.certificateNo}`);
+    await notify(student, {
+      title: 'Clearance complete – certificate issued',
+      body: `Certificate ${certificate.certificateNo} is ready to download.`,
+      link: '/student/certificate',
+      kind: 'success',
+      university: request.university,
+    });
     await sendMail(
-      request.student.email,
+      student.email,
       'ClearPath: Your clearance is complete',
-      `Congratulations ${request.student.name}! All departments have cleared you. Certificate No: ${cert.certificateNo}. Download it from your dashboard.`
+      `Congratulations ${student.name}! All departments have cleared you. Certificate No: ${certificate.certificateNo}. Download it from your dashboard.`
     );
   }
 
-  res.json({ message: `Item ${action === 'clear' ? 'cleared' : 'flagged'}`, status: request.status });
+  res.json({
+    message: `Item ${action === 'clear' ? 'cleared' : 'flagged'}`,
+    status: request.status,
+    certificateNo: certificate?.certificateNo,
+  });
 });

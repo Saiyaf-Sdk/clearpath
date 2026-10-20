@@ -1,6 +1,11 @@
 node_modules/
 .env
+.env.local
 dist/
 server/uploads/*
 !server/uploads/.gitkeep
 .DS_Store
+.transfer/
+_backup-before-auth-update/
+client/_unused/
+*.log

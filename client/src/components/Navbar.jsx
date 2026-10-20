@@ -191,7 +191,7 @@ export default function Navbar() {
                         <small>{user.email}</small>
                       </div>
                       <Link to={homeFor(user.role)} className="menu-item"><LayoutDashboard size={16} /> Dashboard</Link>
-                      <Link to="/profile" className="menu-item"><UserRound size={16} /> Profile &amp; settings</Link>
+                      <Link to="/account" className="menu-item"><UserRound size={16} /> Profile &amp; settings</Link>
                       <Link to="/help" className="menu-item"><LifeBuoy size={16} /> Help centre</Link>
                       <div className="menu-sep" />
                       <button className="menu-item danger" onClick={doLogout}><LogOut size={16} /> Log out</button>
@@ -226,7 +226,7 @@ export default function Navbar() {
             ))}
             {user ? (
               <>
-                <NavLink to="/profile" className="mobile-link"><UserRound size={17} /> Profile &amp; settings</NavLink>
+                <NavLink to="/account" className="mobile-link"><UserRound size={17} /> Profile &amp; settings</NavLink>
                 <button className="mobile-link" onClick={doLogout}><LogOut size={17} /> Log out</button>
               </>
             ) : (

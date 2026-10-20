@@ -2,19 +2,10 @@ const PDFDocument = require('pdfkit');
 const QRCode = require('qrcode');
 const Certificate = require('../models/Certificate');
 const ClearanceRequest = require('../models/ClearanceRequest');
-const path = require('path');
-const fs = require('fs');
 const { asyncHandler, ApiError } = require('../middleware/error');
 const { publicUniversity } = require('../utils/policy');
-
-// Local file path of an uploaded university logo (PNG/JPG), if there is one
-const logoFile = (u) => {
-  if (!u?.logoUrl || !u.logoUrl.startsWith('/uploads/')) return null;
-  const file = path.join(__dirname, '..', u.logoUrl);
-  return fs.existsSync(file) ? file : null;
-};
-
-const verifyUrl = (no) => `${(process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0].trim()}/verify/${no}`;
+const { appUrl } = require('../utils/helpers');
+const { readByUrl } = require('../utils/files');
 
 // GET /api/certificates/:requestId/pdf  (student who owns it, or admin)
 exports.downloadPdf = asyncHandler(async (req, res) => {
@@ -27,7 +18,9 @@ exports.downloadPdf = asyncHandler(async (req, res) => {
     throw new ApiError(403, 'This certificate belongs to another university');
   }
   const request = await ClearanceRequest.findById(cert.request).populate('items.department', 'name order');
+  const verifyUrl = (no) => `${appUrl(req)}/verify/${no}`;
   const qrPng = await QRCode.toBuffer(verifyUrl(cert.certificateNo), { width: 300, margin: 1 });
+  const logo = (await readByUrl(cert.university?.logoUrl))?.buffer || null;
 
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="ClearPath-${cert.certificateNo}.pdf"`);
@@ -41,7 +34,6 @@ exports.downloadPdf = asyncHandler(async (req, res) => {
   // Border + header: the issuing university's logo and name, then the ClearPath line
   doc.rect(25, 25, W - 50, doc.page.height - 50).lineWidth(2).stroke(navy);
   const uni = cert.university;
-  const logo = logoFile(uni);
   let headY = 55;
   if (logo) {
     try {
@@ -110,4 +102,14 @@ exports.verify = asyncHandler(async (req, res) => {
     university: publicUniversity(cert.university),
     message: cert.isRevoked ? 'This certificate has been revoked' : 'Certificate is valid',
   });
+});
+
+// GET /api/verify/:certificateNo/qr.png  (public) – QR code image that opens the verify page
+exports.qr = asyncHandler(async (req, res) => {
+  const cert = await Certificate.findOne({ certificateNo: String(req.params.certificateNo).toUpperCase() }).select('certificateNo').lean();
+  if (!cert) throw new ApiError(404, 'Certificate not found');
+  const png = await QRCode.toBuffer(`${appUrl(req)}/verify/${cert.certificateNo}`, { width: 320, margin: 1 });
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.end(png);
 });

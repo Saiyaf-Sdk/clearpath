@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { Building2, Globe, GraduationCap, ImageUp, Plus, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
+import { Building2, Globe, GraduationCap, ImageUp, Plus, Search, Trash2, UserPlus, Users } from 'lucide-react';
 import api, { errMsg } from '../../api';
 import { useDialog } from '../../context/DialogContext';
 import { item, stagger } from '../../components/Page';
-import { Badge, Drawer, Empty, PageSkeleton, Spin, StatCard, UniLogo } from '../../components/ui';
+import { Badge, Drawer, Empty, PageHeader, PageSkeleton, Spin, StatCard, UniLogo } from '../../components/ui';
 
 const emptyUni = { name: '', shortName: '', code: '', domains: '', website: '' };
 
@@ -15,7 +15,7 @@ const emptyUni = { name: '', shortName: '', code: '', domains: '', website: '' }
   - its logo (official file provided by the university)
   - its first university admin, who then sets up departments, officers and the student list
 */
-export default function PlatformDashboard() {
+export default function PlatformUniversities() {
   const { confirm } = useDialog();
   const [unis, setUnis] = useState(null);
   const [search, setSearch] = useState('');
@@ -60,15 +60,12 @@ export default function PlatformDashboard() {
   };
 
   return (
-    <div className="dashboard">
-      <div className="page-head">
-        <div>
-          <span className="eyebrow"><ShieldCheck size={14} /> Platform administration</span>
-          <h1>Universities on ClearPath</h1>
-          <p className="muted">Each university gets its own portal. A user's email domain decides which portal they enter.</p>
-        </div>
-        <button className="btn btn-primary" onClick={() => setShowAdd((s) => !s)}><Plus size={16} /> Add university</button>
-      </div>
+    <div className="page">
+      <PageHeader
+        title="Universities"
+        subtitle="Each university gets its own portal. A user's email domain decides which portal they enter."
+        actions={<button className="btn btn-primary" onClick={() => setShowAdd((s) => !s)}><Plus size={16} /> Add university</button>}
+      />
 
       <motion.div className="stats" variants={stagger} initial="hidden" animate="show">
         <motion.div variants={item}><StatCard icon={Building2} label="Universities" value={unis.length} /></motion.div>

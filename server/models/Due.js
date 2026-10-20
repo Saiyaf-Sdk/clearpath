@@ -13,6 +13,8 @@ const dueSchema = new mongoose.Schema(
       default: 'unpaid',
     },
     receiptUrl: String,
+    receiptName: String, // original file name of the uploaded receipt
+    receiptAt: Date,
     officerNote: { type: String, trim: true },
     addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

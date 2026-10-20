@@ -7,6 +7,7 @@ router.use(protect);
 router.get('/my', authorize('student'), c.getMyDues);
 router.post('/:id/receipt', authorize('student'), upload.single('receipt'), c.uploadReceipt);
 router.get('/department', authorize('officer', 'admin'), c.getDepartmentDues);
+router.get('/lookup', authorize('officer', 'admin'), c.lookupStudent);
 router.post('/', authorize('officer', 'admin'), c.addDue);
 router.patch('/:id/verify', authorize('officer', 'admin'), c.verifyDue);
 router.delete('/:id', authorize('officer', 'admin'), c.deleteDue);

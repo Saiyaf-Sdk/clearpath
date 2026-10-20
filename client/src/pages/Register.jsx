@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { AnimatePresence, motion, useIsPresent } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
   ArrowLeft, ArrowRight, BadgeCheck, Check, CircleAlert, Eye, EyeOff, Hash, Info, Lock, Mail, Phone, ShieldCheck, UserCheck,
@@ -98,8 +98,7 @@ export default function Register() {
 
   // Which university portal this email belongs to (shown live under the email field)
   const portal = useUniversityFor(form.email);
-  const isPresent = useIsPresent();
-  if (user && isPresent) return <Navigate to={homeFor(user.role)} replace />;
+  if (user) return <Navigate to={homeFor(user.role)} replace />;
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   const go = (n) => { setDir(n > step ? 1 : -1); setError(''); setStep(n); };
@@ -148,7 +147,7 @@ export default function Register() {
     try {
       await completeRegistration({ regNo: form.regNo, email: form.email, code, password: form.password, phone: form.phone });
       toast.success(`Welcome to ClearPath, ${student.name.split(' ')[0]}!`);
-      navigate('/student');
+      navigate('/student', { replace: true });
     } catch (err) {
       setError(errMsg(err));
       if (/code/i.test(errMsg(err))) go(1);

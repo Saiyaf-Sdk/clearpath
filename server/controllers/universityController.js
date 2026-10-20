@@ -1,11 +1,10 @@
-const fs = require('fs');
-const path = require('path');
 const University = require('../models/University');
 const User = require('../models/User');
 const EnrolledStudent = require('../models/EnrolledStudent');
 const { asyncHandler, ApiError } = require('../middleware/error');
 const { universityForEmail, publicUniversity, emailBelongsTo } = require('../utils/policy');
 const { audit } = require('../utils/helpers');
+const { saveUpload, removeByUrl } = require('../utils/files');
 
 /* ---------- Public ---------- */
 
@@ -81,12 +80,10 @@ exports.update = asyncHandler(async (req, res) => {
 exports.uploadLogo = asyncHandler(async (req, res) => {
   if (!req.file) throw new ApiError(400, 'Please choose a PNG or JPG logo');
   const uni = await University.findById(req.params.id);
-  if (!uni) {
-    fs.unlink(req.file.path, () => {});
-    throw new ApiError(404, 'University not found');
-  }
-  if (uni.logoUrl?.startsWith('/uploads/')) fs.unlink(path.join(__dirname, '..', uni.logoUrl), () => {});
-  uni.logoUrl = `/uploads/logos/${req.file.filename}`;
+  if (!uni) throw new ApiError(404, 'University not found');
+  const url = await saveUpload(req.file, { kind: 'logo', owner: req.user._id, university: uni._id });
+  await removeByUrl(uni.logoUrl);
+  uni.logoUrl = url;
   await uni.save();
   await audit(req.user, 'UNIVERSITY_LOGO_UPDATED', uni._id, uni.name);
   res.json(uni);
@@ -96,9 +93,10 @@ exports.uploadLogo = asyncHandler(async (req, res) => {
 exports.removeLogo = asyncHandler(async (req, res) => {
   const uni = await University.findById(req.params.id);
   if (!uni) throw new ApiError(404, 'University not found');
-  if (uni.logoUrl?.startsWith('/uploads/')) fs.unlink(path.join(__dirname, '..', uni.logoUrl), () => {});
+  await removeByUrl(uni.logoUrl);
   uni.logoUrl = undefined;
   await uni.save();
+  await audit(req.user, 'UNIVERSITY_LOGO_REMOVED', uni._id, uni.name);
   res.json(uni);
 });
 

@@ -2,206 +2,179 @@
 
 EE4207 – Web Application Development · MERN stack (MongoDB, Express, React, Node.js)
 
-Students submit one online clearance request. Every department (Library, Hostel, Finance, Labs, Sports, Student Affairs) reviews it in parallel, flags dues if needed, and once all departments clear the student, a PDF certificate with a QR code is issued. Anyone can verify the certificate on a public page.
+Students submit **one online clearance request**. Every department (Library, Hostel, Finance, Labs, Sports, Student Affairs) reviews it in parallel, records dues when something is owed, verifies uploaded payment receipts, and clears the student. When the last department clears them, a **PDF certificate with a QR code** is issued automatically, and anyone can verify it on a public page.
+
+One platform serves **all 17 Sri Lankan state universities**: a user's university email decides which university portal they enter, and every university only ever sees its own data.
 
 ---
 
-## 1. What you need (one-time)
+## 1. Features
 
-| Tool | Get it from |
+| Role | Pages |
 | --- | --- |
-| Node.js 18 or newer (LTS) | https://nodejs.org |
-| A free MongoDB Atlas database | https://www.mongodb.com/cloud/atlas/register |
-| VS Code (recommended) | https://code.visualstudio.com |
-| Git + a GitHub account (for hosting) | https://git-scm.com |
+| **Student** | Overview (progress, next steps, recent updates) · Clearance request (submit, live department tracker, history) · Dues & payments (upload receipts) · Certificate (preview, PDF download, QR, share link) |
+| **Department officer** | Overview (workload, 14-day chart, money collected, average turnaround, oldest requests, recent activity) · Clearance requests (filter, search, sort, side panel, bulk clear, CSV export) · Receipts to verify · Dues register (add dues with live student check, settle, waive, export) · Activity history |
+| **University admin** | Overview (KPIs and charts) · All requests (filters, full history drawer, admin override, CSV) · Reports (faculty, reason, dues by department, print / CSV) · Official student list (CSV import) · Users & staff · Departments · Audit log |
+| **Platform admin** | Overview of all universities · Universities (domains, logos, first admin) · Platform audit log |
+| **Everyone** | Landing page, verified registration (student list + university email + 6-digit code), login with "keep me signed in", forgot / reset password, certificate verification, help centre, notifications bell, account settings, dark mode |
 
-### Create the MongoDB Atlas database (about 5 minutes)
-1. Sign up → **Create** a free **M0** cluster.
-2. **Database Access** → Add a database user (username + password). Remember them.
-3. **Network Access** → Add IP Address → **Allow access from anywhere** (`0.0.0.0/0`).
-4. **Connect** → Drivers → copy the connection string. It looks like
-   `mongodb+srv://myuser:<password>@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority`
-5. Replace `<password>` with your password and add the database name `clearpath` after `.net/`:
-   `mongodb+srv://myuser:mypass@cluster0.xxxxx.mongodb.net/clearpath?retryWrites=true&w=majority`
+**Engineering:** JWT auth with role-based access · per-university data isolation · bcrypt passwords · Helmet security headers and CSP · CORS whitelist · brute-force rate limiting on sign-in routes · uploads stored in MongoDB (survive hosting restarts) · audit log of every action · in-app + email notifications · lazy-loaded pages · error boundaries (a crashing page never blanks the app) · every page has its own URL (refresh and back button work) · health check endpoint · graceful shutdown.
 
 ---
 
 ## 2. Run it on your computer
 
-> Updated the UI? Run `npm install` again inside `client` (new packages: framer-motion, lucide-react, react-hot-toast, recharts, canvas-confetti).
+You need **Node.js 18+** (https://nodejs.org) and a free **MongoDB Atlas** database.
 
-Open **two terminals** in VS Code (Terminal → New Terminal).
+### 2a. MongoDB Atlas (once, ~5 minutes)
+1. Sign up at https://www.mongodb.com/cloud/atlas/register and create a free **M0** cluster (AWS, Mumbai is closest).
+2. Create a database user (letters and numbers only in the password).
+3. **Network Access → Add IP Address → Allow access from anywhere** (`0.0.0.0/0`).
+4. **Connect → Drivers → Node.js** → copy the connection string and add `clearpath` after `.net/`:
+   `mongodb+srv://USER:PASSWORD@cluster0.xxxxx.mongodb.net/clearpath?retryWrites=true&w=majority`
 
-### Terminal 1 – backend API
+### 2b. Backend (terminal 1)
 ```bash
 cd server
 npm install
-copy .env.example .env        # on Mac/Linux: cp .env.example .env
+copy .env.example .env        # Mac/Linux: cp .env.example .env
 ```
-Open `server/.env` and paste your Atlas string into `MONGO_URI`, and type any long random text for `JWT_SECRET`. Then:
+Edit `server/.env`: paste your connection string into `MONGO_URI` and type a long random `JWT_SECRET`. Then:
 ```bash
-npm run seed     # resets the DB: 17 universities + demo accounts
-npm run dev      # starts the API on http://localhost:5000
+npm run seed     # resets the database: 17 universities + realistic demo data
+npm run dev      # API on http://localhost:5000  → "MongoDB connected"
 ```
-You should see `MongoDB connected` and `ClearPath API running on port 5000`.
-Check http://localhost:5000/api/health in your browser → `{"status":"ok"}`.
 
-### Terminal 2 – React frontend
+### 2c. Frontend (terminal 2)
 ```bash
 cd client
 npm install
-copy .env.example .env        # on Mac/Linux: cp .env.example .env
-npm run dev
+npm run dev      # opens http://localhost:5173
 ```
-Open http://localhost:5173
+`client/.env` should contain `VITE_API_URL=http://localhost:5000`.
 
-### Demo accounts (password for all: `password123`)
-| Role | Email |
-| --- | --- |
-| Platform admin (all universities) | platform@clearpath.lk |
-| Ruhuna admin | demo.admin@ruh.ac.lk |
-| Ruhuna officers | demo.lib@ · demo.hos@ · demo.fin@ · demo.lab@ · demo.spo@ · demo.saf@ruh.ac.lk |
-| Ruhuna student with a library due | demo.kasun@ruh.ac.lk (EG/2021/4501) |
-| Ruhuna student with no dues | demo.nimali@ruh.ac.lk |
-| Colombo admin / student | demo.admin@cmb.ac.lk · demo.saman@cmb.ac.lk |
-| Not yet registered (try Create account) | EG/2021/4519 + demo.amal@ruh.ac.lk · SC/2021/2001 + demo.ruwan@cmb.ac.lk |
-
-`npm run seed` **wipes the database** and reloads the 17 universities and these accounts. Keep `SMTP_HOST` empty while using demo addresses: the registration code and reset link are then shown on screen instead of emailed.
-
-While running `npm run dev`, the login page shows a small **Demo access** panel that fills these accounts in. It is hidden in a production build unless you set `VITE_SHOW_DEMO=true` in `client/.env`.
-
-**Forgot password without email set up:** if `SMTP_HOST` is empty and `NODE_ENV` is not `production`, the forgot-password screen shows a direct "Open reset link" button so the flow can be demonstrated. With SMTP configured, the link is emailed instead.
-
----
-
-## 3. Demo script for the viva (about 8 minutes)
-
-1. **Home page** → explain the problem (paper form, 6 offices) and the solution.
-2. **Log in as Kasun (demo.kasun@ruh.ac.lk)** → submit a clearance request (reason: Graduation).
-   The tracker shows 6 departments; **Library already shows "Dues found"** because of the LKR 450 fine. Point out the dues table.
-3. **Log out → log in as demo.lib@ruh.ac.lk** → Requests tab → click **Clear** on Kasun.
-   The API refuses: *"Cannot clear: the student still has 1 unpaid due(s)"* (business rule enforced on the server).
-4. **Log in as Kasun** → upload any image/PDF as the **payment receipt** for the library due.
-   **Log in as demo.lib@** again → Dues tab → open the receipt → **Approve** → Requests tab → **Clear** Kasun (now it works).
-5. Log in as each other officer (demo.hos@, demo.fin@, demo.lab@, demo.spo@, demo.saf@ruh.ac.lk) and click **Clear**
-   (or, faster: log in as **admin → Requests tab → click each grey department chip** to override).
-6. **Log in as Kasun again** → 100% cleared → **Download PDF** certificate → show the QR code.
-7. Open the **Verify** page (or scan the QR with your phone when hosted) → certificate is valid.
-8. **Admin → Overview**: workload chart per department, dues collected, average days to clear. **Audit** tab: every action is logged.
-9. Optional: in Postman, call `GET /api/clearances/my` without a token → `401`; as a student call `GET /api/admin/users` → `403` (role-based access).
-
----
-
-## 4. Host it online (free)
-
-### 4a. Push to GitHub
-```bash
-git init
-git add .
-git commit -m "ClearPath MERN app"
-git branch -M main
-git remote add origin https://github.com/<you>/clearpath.git
-git push -u origin main
-```
-(`.env` files are ignored by `.gitignore`, so your passwords are not uploaded.)
-
-### 4b. Backend on Render (https://render.com)
-1. New → **Web Service** → connect your GitHub repo.
-2. **Root Directory:** `server` · **Build Command:** `npm install` · **Start Command:** `npm start` · Instance: Free.
-3. **Environment variables:** `MONGO_URI`, `JWT_SECRET`, `JWT_EXPIRES_IN=7d`, `CLIENT_URL=https://<your-vercel-app>.vercel.app` (set it after step 4c, then redeploy).
-4. Deploy → you get a URL like `https://clearpath-api.onrender.com`. Test `/api/health`.
-
-> The free Render plan sleeps after 15 minutes idle; the first request then takes ~30–50 seconds. Open the API URL a minute before your demo. Uploaded receipts are stored on the server disk and are cleared when Render restarts — fine for a demo.
-
-### 4c. Frontend on Vercel (https://vercel.com)
-1. Add New → Project → import the same repo.
-2. **Root Directory:** `client` · Framework preset: **Vite**.
-3. Environment variable: `VITE_API_URL=https://clearpath-api.onrender.com` (your Render URL, no trailing slash).
-4. Deploy. Copy the Vercel URL into Render's `CLIENT_URL` and redeploy Render (this fixes CORS and the QR code link).
-
----
-
-## Pages in the app
-
-| URL | Page | Who |
+### 2d. Demo accounts (password for all: `password123`)
+| Who | Email | What you'll see |
 | --- | --- | --- |
-| `/` | Landing page – what ClearPath does, how it works, features, roles, security, FAQ | Everyone |
-| `/register`, `/login` | Two-step student registration and login (all roles, "Keep me signed in") | Everyone |
-| `/forgot-password`, `/reset-password/:token` | Password reset by email (link valid 15 min, one use) | Everyone |
-| `/verify`, `/verify/:no` | Public certificate verification | Everyone |
-| `/help` | Help centre with step-by-step guides per role and troubleshooting | Everyone |
-| `/student` | Tracker, dues, receipt upload, certificate download | Student |
-| `/officer` | Department desk: review, clear/flag, dues and receipts | Officer |
-| `/admin` | Overview charts, requests, users, departments, audit log | Admin |
-| `/platform` | Universities, domains, logos and university admins | Platform admin |
-| `/profile` | Account details, change password, dark mode | Logged-in users |
-| anything else | Friendly 404 page | Everyone |
+| Student | `demo.kasun@ruh.ac.lk` | Request in progress, LKR 450 library fine |
+| Student | `demo.nimali@ruh.ac.lk` | Fully cleared, certificate ready |
+| Student | `demo.tharindu@ruh.ac.lk` | No request yet – use him to show submitting one |
+| Library officer | `demo.lib@ruh.ac.lk` | Busy department desk (also `demo.hos@`, `demo.fin@`, `demo.lab@`, `demo.spo@`, `demo.saf@ruh.ac.lk`) |
+| University admin | `demo.admin@ruh.ac.lk` | ~48 students, 40 requests, charts, audit log |
+| Another university | `demo.saman@cmb.ac.lk`, `demo.admin@cmb.ac.lk` | University of Colombo portal (separate data) |
+| Platform admin | `platform@clearpath.lk` | All universities |
+| Register a new student | Reg. no `EG/2021/4519` + `demo.amal@ruh.ac.lk` | The 6-digit code is shown on screen (no email set up) |
 
-## Multi-university (one platform, a portal per university)
-- All 17 UGC state universities are pre-loaded (`server/data/universities.js`) with their email domains.
-- A user's email domain decides their university portal (e.g. `@ruh.ac.lk` → University of Ruhuna). Sub-domains match too.
-- Every record (users, departments, requests, dues, certificates, student list) belongs to one university; every query is limited to the signed-in user's university.
-- **Platform admin** (`platform@clearpath.lk`) manages universities, their domains, logos and each university's first admin at `/platform`.
-- **Logos:** upload each university's official logo (PNG/JPG) on the platform screen; an initials badge shows until then. Logos are not bundled with the project.
-- Registration numbers only need to be unique inside one university.
+`npm run seed` wipes the database each time. While `npm run dev` runs, the login page has a **Demo access** panel that fills these in.
 
-## Design system (colour rule)
-The UI follows a **60-30-10** rule: 60% neutral surfaces, 30% ink (text, borders), 10% one brand colour (indigo `#4f46e5`) used only for primary buttons, links, focus and active states. Green, amber and red are reserved for status meaning (cleared/paid, dues, unpaid/error) and are never decorative. All colours are CSS variables in `client/src/styles.css`, so the brand colour can be changed in one place, and dark mode is built in.
+---
+
+## 3. Deploy it online (free) – one service on Render
+
+The Express server also serves the built React app, so the whole system is **one web service with one URL** (no CORS setup, the QR codes point to the right address automatically).
+
+1. **Push the project to GitHub** (`.env` files are ignored, so your passwords stay private):
+   ```bash
+   git add .
+   git commit -m "ClearPath"
+   git branch -M main
+   git remote add origin https://github.com/<you>/clearpath.git
+   git push -u origin main
+   ```
+2. **Render** (https://render.com) → sign in with GitHub → **New → Blueprint** → choose the repository. Render reads `render.yaml`.
+3. When asked, paste your Atlas connection string as **`MONGO_URI`**. `JWT_SECRET` is generated for you.
+4. Click **Apply**. The first build takes a few minutes. You get a URL like `https://clearpath.onrender.com`.
+5. **Load the demo data into the online database**: on your computer, with `MONGO_URI` in `server/.env` pointing to the same Atlas database, run `npm run seed` in `server` (or seed once and both local and online use it).
+6. Open the URL → home page. Check `https://<your-app>.onrender.com/api/health` → `{"status":"ok","db":"connected"}`.
+
+**Manual setup instead of the Blueprint:** New → Web Service → repository → Runtime **Node**, Build command `npm run build`, Start command `npm start`, Health check path `/api/health`, and environment variables `NODE_ENV=production`, `MONGO_URI`, `JWT_SECRET` (long random text), `JWT_EXPIRES_IN=7d`, and for the demo `VITE_SHOW_DEMO=true`, `DEMO_MODE=true`.
+
+> The free Render plan sleeps after 15 minutes without visitors; the first visit then takes about a minute. Open the site a few minutes before your demonstration.
+
+**Before a real (non-demo) launch:** set `VITE_SHOW_DEMO=false` and `DEMO_MODE=false`, configure SMTP (e.g. a Gmail app password or Brevo) so registration codes and reset links are emailed, run `npm run seed` only once (or create universities and admins from the platform screen), and change every demo password.
+
+### Alternative: frontend on Vercel, API on Render
+Deploy `server` as a Render web service (root directory `server`, start `npm start`) with `CLIENT_URL=https://<app>.vercel.app`, and deploy `client` on Vercel (root directory `client`, preset Vite) with `VITE_API_URL=https://<api>.onrender.com`. `client/vercel.json` already handles page refreshes.
+
+### Environment variables (server)
+| Variable | Required | Meaning |
+| --- | --- | --- |
+| `MONGO_URI` | yes | MongoDB connection string |
+| `JWT_SECRET` | yes | Secret for login tokens (≥ 24 characters in production) |
+| `JWT_EXPIRES_IN` | | Session length, default `7d` |
+| `NODE_ENV` | | `production` on the server |
+| `CLIENT_URL` | | Web app address(es), comma separated. Leave empty when the API serves the app |
+| `APP_TIMEZONE` | | Time zone for charts, default `Asia/Colombo` |
+| `DEMO_MODE` | | `true` shows codes/reset links on screen when SMTP is not set (demo only) |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | | Email sending; empty = print emails to the server log |
+| `VITE_SHOW_DEMO` (build time) | | `true` shows the demo-accounts panel on the login page |
+
+---
+
+## 4. Demonstration script (about 10 minutes)
+
+1. **Home page** – the problem (paper form, six offices) and the solution. Show the university email → portal idea.
+2. **Kasun (student)** – Overview shows 3 of 6 cleared and exactly what to do next. Open **Dues & payments** and upload any image/PDF as the receipt for the LKR 450 library fine.
+3. **Library officer** (`demo.lib@`) – the Overview chart, KPIs and badges. Open **Receipts to verify** → approve. Kasun automatically returns to the **Pending** list ("dues settled – waiting for final check") → **Clear**.
+4. Try to clear a student who still owes money → the server refuses (business rule enforced in the API).
+5. Clear Kasun in the remaining departments (log in as `demo.lab@` and `demo.saf@`, or as **admin → All requests → click the grey chips** to override).
+6. **Kasun** – the **Certificate** page: preview, download the PDF, copy the verification link. Open **/verify** (or scan the QR on your phone when deployed) → valid.
+7. **Tharindu** – submit a brand-new request and watch it appear in every officer's list and bell.
+8. **Admin** – Overview and **Reports** (faculty, reasons, dues by department, CSV export), **Audit log**, **Official student list** import, then **register Amal** from the Create account page with the on-screen code.
+9. **Colombo admin** – a different university sees completely different data. **Platform admin** – all universities, logos and domains.
+10. Security points: role-based routes (a student opening `/admin` is sent to their own dashboard), JWT expiry, rate limiting, per-university isolation.
+
+---
 
 ## 5. Project structure
 ```
 clearpath/
-├── server/                    Express REST API
-│   ├── server.js              app entry: middleware + routes
-│   ├── config/db.js           MongoDB connection
-│   ├── models/                Mongoose schemas (User, Department, ClearanceRequest, Due, Certificate, AuditLog)
-│   ├── controllers/           business logic
-│   ├── routes/                URL → controller mapping
-│   ├── middleware/            JWT auth + role check, file upload, error handler
-│   ├── utils/                 JWT, audit log, certificate numbers, email
-│   └── seed.js                demo data
-└── client/                    React (Vite) single-page app
+├── package.json            root scripts: build (installs + builds the app), start, seed
+├── render.yaml             one-click Render deployment
+├── server/                 Express REST API (also serves client/dist in production)
+│   ├── server.js           security headers, CORS, rate limits, routes, static app, shutdown
+│   ├── config/db.js        MongoDB connection with retries
+│   ├── models/             University, User, Department, ClearanceRequest, Due, Certificate,
+│   │                       EnrolledStudent, AuditLog, Notification, StoredFile
+│   ├── controllers/        auth, clearance, due, certificate, admin, stats, notification, file, university
+│   ├── routes/             URL → controller mapping
+│   ├── middleware/         JWT auth + roles, uploads, rate limiting, errors
+│   ├── utils/              helpers (audit, notify, certificates), files, mailer, university policy
+│   ├── data/universities.js the 17 state universities and their email domains
+│   └── seed.js             realistic demo data
+└── client/                 React 18 + Vite single-page app
     └── src/
-        ├── api.js             axios instance (adds JWT automatically)
-        ├── context/           login state (AuthContext)
-        ├── components/        Navbar, ProtectedRoute, badges/alerts
-        └── pages/             Home, Login, Register, Verify, student/, officer/, admin/
+        ├── App.jsx         routes (public pages + signed-in area), lazy loading
+        ├── api.js          axios instance (JWT, session expiry)
+        ├── context/        auth, theme, dialogs
+        ├── hooks/useFetch  data loading with loading/error states
+        ├── components/     app shell (sidebar, top bar, bell), UI kit, charts, error boundary
+        └── pages/          public pages, student/, officer/, admin/, platform/, account/
 ```
 
-## 6. REST API summary
-All routes start with `/api`. Protected routes need the header `Authorization: Bearer <token>`.
+## 6. REST API (all under `/api`)
+| Area | Endpoints |
+| --- | --- |
+| Auth | `POST /auth/register/start · /register/verify · /register/complete · /login · /forgot-password`, `GET/POST /auth/reset-password/:token`, `GET/PATCH /auth/me`, `PATCH /auth/password` |
+| Clearance | `POST /clearances`, `GET /clearances/my`, `PATCH /clearances/:id/cancel`, `GET /clearances/department`, `PATCH /clearances/:id/items/:deptId` |
+| Dues | `GET /dues/my`, `POST /dues/:id/receipt`, `GET /dues/department`, `GET /dues/lookup`, `POST /dues`, `PATCH /dues/:id/verify`, `DELETE /dues/:id` |
+| Certificates | `GET /certificates/:requestId/pdf`, `GET /verify/:no` (public), `GET /verify/:no/qr.png` (public) |
+| Dashboards | `GET /stats/badges`, `GET /stats/officer`, `GET /stats/officer/activity` |
+| Notifications | `GET /notifications`, `PATCH /notifications/read-all`, `PATCH /notifications/:id/read`, `DELETE /notifications` |
+| Admin | `GET/POST/PATCH/DELETE /admin/users`, `GET /admin/users/:id/summary`, `GET /admin/requests`, `GET /admin/requests/:id`, `GET /admin/reports`, `GET /admin/audit`, roster `GET/POST /admin/roster`, `POST /admin/roster/import`, `DELETE /admin/roster/:id`, departments `GET/POST/PATCH/DELETE /departments` |
+| Platform | `GET /platform/overview`, `GET /platform/audit`, `GET/POST/PATCH /platform/universities`, logos, admins |
+| Public | `GET /universities`, `GET /universities/lookup?email=`, `GET /files/:key`, `GET /health` |
 
-| Method | Endpoint | Who |
-| --- | --- | --- |
-| POST | /auth/register · /auth/login | Public |
-| GET | /auth/me | Logged in |
-| POST | /clearances | Student |
-| GET | /clearances/my | Student |
-| PATCH | /clearances/:id/cancel | Student |
-| GET | /clearances/department?status= | Officer / Admin |
-| PATCH | /clearances/:id/items/:deptId `{action: "clear"|"flag", remark}` | Officer / Admin |
-| GET | /dues/my | Student |
-| POST | /dues/:id/receipt (multipart `receipt`) | Student |
-| GET | /dues/department · POST /dues `{regNo, amount, description}` | Officer |
-| PATCH | /dues/:id/verify `{approve, waive, note}` · DELETE /dues/:id | Officer |
-| GET | /certificates/:requestId/pdf | Student / Admin |
-| GET | /verify/:certificateNo | Public |
-| GET/POST/PATCH/DELETE | /departments | Admin (GET: all) |
-| GET/POST/PATCH/DELETE | /admin/users | Admin |
-| GET | /admin/requests · /admin/reports · /admin/audit | Admin |
-
-## 7. Key technical points to mention
-- **Security:** bcrypt password hashing, JWT auth, role-based middleware (`authorize('officer')`), Helmet headers, CORS restricted to the frontend, upload type/size limits (JPG/PNG/PDF, 3 MB).
-- **Business rule in the API:** a department cannot be cleared while the student has unpaid dues there; adding a due automatically flags an active request.
-- **Automatic certificate:** when the last department clears, the API issues a unique certificate number; the PDF (PDFKit) embeds a QR code (qrcode) that links to the public verify page.
-- **Email notifications** (Nodemailer) on every action; without SMTP settings they are printed in the server console.
-- **Audit log** of every approval, flag, due and account change.
+## 7. Design system
+60-30-10 colour rule: 60% neutral surfaces, 30% ink, 10% one brand colour (indigo `#4f46e5`) for primary actions, links, focus and active states. Green, amber and red only ever mean cleared/paid, dues and unpaid/error. System fonts (San Francisco / Segoe UI / Roboto). Light and dark themes. All tokens are CSS variables in `client/src/styles.css`; the app shell lives in `client/src/app.css`.
 
 ## 8. Troubleshooting
 | Problem | Fix |
 | --- | --- |
-| `MongoDB connection error` | Check `MONGO_URI`, the password, and that Atlas Network Access allows `0.0.0.0/0`. |
-| Login says "Network Error" | The API is not running, or `VITE_API_URL` is wrong. Restart `npm run dev` after editing `.env`. |
-| `Not allowed by CORS` | `CLIENT_URL` in `server/.env` must exactly match the frontend URL (no trailing slash). |
-| Changed `.env` but nothing happened | Stop (Ctrl+C) and restart the server / Vite. |
+| `MongoDB connection error` / `bad auth` | Check `MONGO_URI` and the password, and that Atlas Network Access allows `0.0.0.0/0`. |
+| `querySrv ECONNREFUSED` | Your network's DNS blocks Atlas. Set DNS to `8.8.8.8` or use a mobile hotspot. |
+| `Cannot find module …` after pulling changes | Delete `node_modules` and `package-lock.json` in that folder and run `npm install` again. |
+| Login says "Cannot reach the server" | The API isn't running, or `VITE_API_URL` is wrong. Restart both after editing a `.env`. |
+| Sent back to the login page after `npm run seed` | Normal – seeding creates new accounts, so old sessions end. Log in again. |
 | Port 5000 in use | Set `PORT=5001` in `server/.env` and `VITE_API_URL=http://localhost:5001`. |
+| Render build fails | Check the build log; the build command must be `npm run build` at the repository root. |
