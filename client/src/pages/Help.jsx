@@ -65,7 +65,7 @@ export default function Help() {
           <Reveal className="card help-section" amount={0.1}>
             <section id="start">
               <h2><Rocket size={20} className="text-brand" /> Getting started</h2>
-              <p className="muted">ClearPath has three types of accounts. Everyone logs in on the same page.</p>
+              <p className="muted">ClearPath serves all state universities. Everyone logs in on the same page with their university email, and the email decides which university portal opens.</p>
               <ol className="guide-steps">
                 <li><div><strong>Students</strong>Create your account from <Link to="/register">Create account</Link>. Enter your registration number and university email, type the 6-digit code we email you, then choose a password. Only students on the university's official list can register.</div></li>
                 <li><div><strong>Department officers</strong>Your account is created by the administrator and linked to your department (e.g. Library).</div></li>

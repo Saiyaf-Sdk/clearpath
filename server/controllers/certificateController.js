@@ -2,16 +2,29 @@ const PDFDocument = require('pdfkit');
 const QRCode = require('qrcode');
 const Certificate = require('../models/Certificate');
 const ClearanceRequest = require('../models/ClearanceRequest');
+const path = require('path');
+const fs = require('fs');
 const { asyncHandler, ApiError } = require('../middleware/error');
+const { publicUniversity } = require('../utils/policy');
+
+// Local file path of an uploaded university logo (PNG/JPG), if there is one
+const logoFile = (u) => {
+  if (!u?.logoUrl || !u.logoUrl.startsWith('/uploads/')) return null;
+  const file = path.join(__dirname, '..', u.logoUrl);
+  return fs.existsSync(file) ? file : null;
+};
 
 const verifyUrl = (no) => `${(process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0].trim()}/verify/${no}`;
 
 // GET /api/certificates/:requestId/pdf  (student who owns it, or admin)
 exports.downloadPdf = asyncHandler(async (req, res) => {
-  const cert = await Certificate.findOne({ request: req.params.requestId }).populate('student', 'name regNo faculty email');
+  const cert = await Certificate.findOne({ request: req.params.requestId }).populate('student', 'name regNo faculty email').populate('university');
   if (!cert) throw new ApiError(404, 'Certificate not issued yet');
   if (req.user.role === 'student' && String(cert.student._id) !== String(req.user._id)) {
     throw new ApiError(403, 'Not your certificate');
+  }
+  if (req.user.role === 'admin' && String(cert.university?._id) !== String(req.user.university?._id)) {
+    throw new ApiError(403, 'This certificate belongs to another university');
   }
   const request = await ClearanceRequest.findById(cert.request).populate('items.department', 'name order');
   const qrPng = await QRCode.toBuffer(verifyUrl(cert.certificateNo), { width: 300, margin: 1 });
@@ -25,10 +38,21 @@ exports.downloadPdf = asyncHandler(async (req, res) => {
   const navy = '#1e3a8a';
   const W = doc.page.width;
 
-  // Border + header
+  // Border + header: the issuing university's logo and name, then the ClearPath line
   doc.rect(25, 25, W - 50, doc.page.height - 50).lineWidth(2).stroke(navy);
-  doc.fillColor(navy).fontSize(26).font('Helvetica-Bold').text('ClearPath', 50, 60, { align: 'center' });
-  doc.fillColor('#475569').fontSize(11).font('Helvetica').text('University Digital Clearance & No-Dues Management System', { align: 'center' });
+  const uni = cert.university;
+  const logo = logoFile(uni);
+  let headY = 55;
+  if (logo) {
+    try {
+      doc.image(logo, W / 2 - 32, headY, { fit: [64, 64], align: 'center' });
+      headY += 74;
+    } catch {
+      /* unsupported image – skip the logo */
+    }
+  }
+  doc.fillColor(navy).fontSize(22).font('Helvetica-Bold').text(uni?.name || 'ClearPath', 50, headY, { align: 'center', width: W - 100 });
+  doc.fillColor('#475569').fontSize(10.5).font('Helvetica').text('Digital Clearance & No-Dues Certificate · issued through ClearPath', { align: 'center', width: W - 100 });
   doc.moveDown(2);
   doc.fillColor('#0f172a').fontSize(20).font('Helvetica-Bold').text('CLEARANCE CERTIFICATE', { align: 'center' });
   doc.moveDown(1.5);
@@ -74,7 +98,7 @@ exports.downloadPdf = asyncHandler(async (req, res) => {
 
 // GET /api/verify/:certificateNo  (public)
 exports.verify = asyncHandler(async (req, res) => {
-  const cert = await Certificate.findOne({ certificateNo: req.params.certificateNo.toUpperCase() }).populate('student', 'name regNo faculty');
+  const cert = await Certificate.findOne({ certificateNo: req.params.certificateNo.toUpperCase() }).populate('student', 'name regNo faculty').populate('university');
   if (!cert) return res.status(404).json({ valid: false, message: 'No certificate found with this number' });
   const request = await ClearanceRequest.findById(cert.request).select('reason completedAt');
   res.json({
@@ -83,6 +107,7 @@ exports.verify = asyncHandler(async (req, res) => {
     issuedAt: cert.issuedAt,
     reason: request?.reason,
     student: { name: cert.student.name, regNo: cert.student.regNo, faculty: cert.student.faculty },
+    university: publicUniversity(cert.university),
     message: cert.isRevoked ? 'This certificate has been revoked' : 'Certificate is valid',
   });
 });

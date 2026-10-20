@@ -19,6 +19,7 @@ import NotFound from './pages/NotFound';
 import StudentDashboard from './pages/student/StudentDashboard';
 import OfficerDashboard from './pages/officer/OfficerDashboard';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import PlatformDashboard from './pages/platform/PlatformDashboard';
 
 export default function App() {
   const location = useLocation();
@@ -67,6 +68,7 @@ export default function App() {
                 <Route path="/student" element={<ProtectedRoute role="student"><Page><StudentDashboard /></Page></ProtectedRoute>} />
                 <Route path="/officer" element={<ProtectedRoute role="officer"><Page><OfficerDashboard /></Page></ProtectedRoute>} />
                 <Route path="/admin" element={<ProtectedRoute role="admin"><Page><AdminDashboard /></Page></ProtectedRoute>} />
+                <Route path="/platform" element={<ProtectedRoute role="superadmin"><Page><PlatformDashboard /></Page></ProtectedRoute>} />
                 <Route path="*" element={<Page><NotFound /></Page>} />
               </Routes>
             </AnimatePresence>

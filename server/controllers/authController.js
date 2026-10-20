@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const User = require('../models/User');
 const EnrolledStudent = require('../models/EnrolledStudent');
-const { emailAllowed, domainHint, devMode, maskEmail } = require('../utils/policy');
+const { universityForEmail, publicUniversity, devMode, maskEmail } = require('../utils/policy');
 const { asyncHandler, ApiError } = require('../middleware/error');
 const { signToken, audit } = require('../utils/helpers');
 const { sendMail } = require('../utils/mailer');
@@ -18,6 +18,8 @@ const publicUser = (u) => ({
   faculty: u.faculty,
   phone: u.phone,
   department: u.department,
+  // The university portal this account belongs to (logo + name shown in the app)
+  university: u.university && u.university.name ? publicUniversity(u.university) : undefined,
 });
 
 /* ---------------- Student registration (verified) ----------------
@@ -25,18 +27,24 @@ const publicUser = (u) => ({
    2. /register/verify   checks the code, returns the student's official name/faculty to confirm identity
    3. /register/complete code + password → creates the account (name/faculty come from the official list)
 ------------------------------------------------------------------- */
+// The university is decided by the email domain, then the student must be on THAT university's list
 const findEnrolled = async (regNo, email, withOtp = false) => {
-  const q = EnrolledStudent.findOne({ regNo: String(regNo || '').toUpperCase().trim() });
+  const university = await universityForEmail(email);
+  if (!university) return { university: null, entry: null };
+  const q = EnrolledStudent.findOne({ university: university._id, regNo: String(regNo || '').toUpperCase().trim() });
   if (withOtp) q.select('+otpHash');
   const entry = await q;
-  if (!entry || entry.email !== String(email || '').toLowerCase().trim()) return null;
-  return entry;
+  if (!entry || entry.email !== String(email || '').toLowerCase().trim()) return { university, entry: null };
+  return { university, entry };
 };
 
-const accountExists = (entry) => User.exists({ $or: [{ email: entry.email }, { regNo: entry.regNo }] });
+const accountExists = (entry) =>
+  User.exists({ $or: [{ email: entry.email }, { university: entry.university, regNo: entry.regNo }] });
+
+const NOT_A_UNIVERSITY = "This email doesn't belong to a university on ClearPath. Please use your university email (for example name@ruh.ac.lk).";
 
 const checkCode = async (regNo, email, code) => {
-  const entry = await findEnrolled(regNo, email, true);
+  const { university, entry } = await findEnrolled(regNo, email, true);
   if (!entry || !entry.otpHash) throw new ApiError(400, 'Please request a new verification code.');
   if (!entry.otpExpires || entry.otpExpires < new Date()) throw new ApiError(400, 'This code has expired. Please request a new one.');
   if (entry.otpAttempts >= 5) throw new ApiError(429, 'Too many incorrect attempts. Please request a new code.');
@@ -45,18 +53,17 @@ const checkCode = async (regNo, email, code) => {
     await entry.save();
     throw new ApiError(400, `That code is not correct. ${Math.max(0, 5 - entry.otpAttempts)} attempt(s) left.`);
   }
-  return entry;
+  return { university, entry };
 };
 
 // POST /api/auth/register/start  body: { regNo, email }
 exports.registerStart = asyncHandler(async (req, res) => {
   const { regNo, email } = req.body;
   if (!regNo || !email) throw new ApiError(400, 'Registration number and university email are required');
-  if (!emailAllowed(email)) throw new ApiError(400, `Please use your university email (${domainHint()}).`);
-
-  const entry = await findEnrolled(regNo, email);
+  const { university, entry } = await findEnrolled(regNo, email);
+  if (!university) throw new ApiError(400, NOT_A_UNIVERSITY);
   if (!entry) {
-    throw new ApiError(404, "We couldn't find this registration number with this email on the university's student list. Check both, or contact Student Affairs.");
+    throw new ApiError(404, `We couldn't find this registration number with this email on the ${university.name} student list. Check both, or contact your Student Affairs office.`);
   }
   if (entry.status === 'activated' || (await accountExists(entry))) {
     throw new ApiError(409, 'An account already exists for this student. Please log in, or use Forgot password.');
@@ -78,7 +85,11 @@ exports.registerStart = asyncHandler(async (req, res) => {
     `Hi ${entry.name},\n\nYour ClearPath verification code is ${code}. It expires in 10 minutes.\n\nIf you didn't try to create an account, you can ignore this email.`
   );
 
-  const out = { message: `We sent a 6-digit code to ${maskEmail(entry.email)}.`, maskedEmail: maskEmail(entry.email) };
+  const out = {
+    message: `We sent a 6-digit code to ${maskEmail(entry.email)}.`,
+    maskedEmail: maskEmail(entry.email),
+    university: publicUniversity(university),
+  };
   if (devMode()) out.devCode = code; // local demo without email only
   res.json(out);
 });
@@ -86,15 +97,15 @@ exports.registerStart = asyncHandler(async (req, res) => {
 // POST /api/auth/register/verify  body: { regNo, email, code }
 exports.registerVerify = asyncHandler(async (req, res) => {
   const { regNo, email, code } = req.body;
-  const entry = await checkCode(regNo, email, code);
-  res.json({ name: entry.name, faculty: entry.faculty, regNo: entry.regNo });
+  const { university, entry } = await checkCode(regNo, email, code);
+  res.json({ name: entry.name, faculty: entry.faculty, regNo: entry.regNo, university: publicUniversity(university) });
 });
 
 // POST /api/auth/register/complete  body: { regNo, email, code, password, phone }
 exports.registerComplete = asyncHandler(async (req, res) => {
   const { regNo, email, code, password, phone } = req.body;
   if (!password || password.length < 6) throw new ApiError(400, 'Password must be at least 6 characters');
-  const entry = await checkCode(regNo, email, code);
+  const { university, entry } = await checkCode(regNo, email, code);
   if (await accountExists(entry)) throw new ApiError(409, 'An account already exists for this student. Please log in.');
 
   const user = await User.create({
@@ -105,7 +116,9 @@ exports.registerComplete = asyncHandler(async (req, res) => {
     faculty: entry.faculty,
     phone,
     role: 'student',
+    university: university._id,
   });
+  user.university = university; // so the response carries the logo and name
 
   entry.status = 'activated';
   entry.activatedAt = new Date();
@@ -125,9 +138,13 @@ exports.login = asyncHandler(async (req, res) => {
 
   const user = await User.findOne({ email: email.toLowerCase() })
     .select('+password')
-    .populate('department', 'name code');
+    .populate('department', 'name code')
+    .populate('university');
   if (!user || !(await user.matchPassword(password))) throw new ApiError(401, 'Invalid email or password');
   if (!user.isActive) throw new ApiError(403, 'Your account has been disabled');
+  if (user.role !== 'superadmin' && user.university && !user.university.isActive) {
+    throw new ApiError(403, 'Your university is not active on ClearPath yet');
+  }
 
   res.json({ token: signToken(user), user: publicUser(user) });
 });

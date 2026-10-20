@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Search, ShieldCheck } from 'lucide-react';
 import api from '../api';
-import { cap, fmtDate, Skeleton } from '../components/ui';
+import { cap, fmtDate, Skeleton, UniLogo } from '../components/ui';
 
 // Animated tick / cross that draws itself
 function ResultIcon({ ok }) {
@@ -71,7 +71,7 @@ export default function Verify() {
       >
         <div className="search-box" style={{ maxWidth: 'none' }}>
           <Search size={16} />
-          <input className="input" placeholder="CP-2026-XXXXXXXX" value={input} onChange={(e) => setInput(e.target.value)} />
+          <input className="input" placeholder="CP-UOR-2026-XXXXXXXX" value={input} onChange={(e) => setInput(e.target.value)} />
         </div>
         <button className="btn btn-primary">Verify</button>
       </form>
@@ -90,6 +90,15 @@ export default function Verify() {
           >
             <ResultIcon ok={result.valid} />
             <h3>{result.message}</h3>
+            {result.university && (
+              <div className="uni-chip" style={{ margin: '10px auto 0' }}>
+                <UniLogo university={result.university} size={36} />
+                <div style={{ textAlign: 'left' }}>
+                  <small>Issued by</small>
+                  <strong>{result.university.name}</strong>
+                </div>
+              </div>
+            )}
             {result.student && (
               <dl className="details">
                 <dt>Name</dt><dd>{result.student.name}</dd>

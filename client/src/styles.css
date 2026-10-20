@@ -287,6 +287,21 @@ select.input option { color: #0f172a; background: #fff; }
 .select-float-label { position: absolute; left: 42px; top: 14px; transform: translateY(-50%); font-size: 0.7rem; font-weight: 600; color: var(--brand); pointer-events: none; }
 .select-float-chev { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
 
+/* University logo / badge */
+.uni-logo { display: inline-grid; place-items: center; flex-shrink: 0; border-radius: 10px; background: var(--brand-soft); color: var(--brand-ink); font-weight: 700; letter-spacing: 0.02em; border: 1px solid var(--brand-soft-2); overflow: hidden; line-height: 1; }
+.uni-logo.has-img { background: #fff; border-color: var(--line); padding: 3px; }
+.uni-logo img { width: 100%; height: 100%; object-fit: contain; }
+.uni-chip { display: inline-flex; align-items: center; gap: 10px; padding: 4px 12px 4px 4px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); }
+.uni-chip strong { font-size: 0.85rem; line-height: 1.15; display: block; }
+.uni-chip small { font-size: 0.72rem; color: var(--muted); display: block; }
+.nav-uni { display: flex; align-items: center; gap: 10px; padding-left: 14px; margin-left: 2px; border-left: 1px solid var(--line); max-width: 280px; }
+.nav-uni span.name { font-size: 0.86rem; font-weight: 600; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.portal-banner { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: var(--brand-soft); border: 1px solid var(--brand-soft-2); }
+.portal-banner strong { display: block; font-size: 0.92rem; color: var(--text); }
+.portal-banner small { color: var(--brand-ink); font-size: 0.78rem; }
+.portal-banner.unknown { background: var(--warn-soft); border-color: transparent; }
+.portal-banner.unknown small { color: var(--warn); }
+
 /* Verification code boxes */
 .otp { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
 .otp input { width: 100%; aspect-ratio: 1 / 1.1; max-height: 58px; text-align: center; font: inherit; font-size: 1.35rem; font-weight: 700; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface); color: var(--text); transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s; }
@@ -832,7 +847,8 @@ tr:last-child td { border-bottom: 0; }
   .reason-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 760px) {
-  .nav-links, .desktop-only, .user-meta, .chev { display: none; }
+  .nav-links, .desktop-only, .user-meta, .chev, .nav-uni .name { display: none; }
+  .nav-uni { padding-left: 10px; }
   .mobile-only { display: grid; }
   .navbar-inner { gap: 10px; padding: 12px 14px; }
   .nav-right { gap: 6px; }

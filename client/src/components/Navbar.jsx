@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { homeFor, useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { UniLogo } from './ui';
 
 // Sections of the landing page shown in the top bar
 export const SECTIONS = [
@@ -94,7 +95,7 @@ export default function Navbar() {
   };
 
   const initials = user?.name?.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();
-  const roleLabel = user?.role === 'officer' ? user.department?.name || 'Officer' : user?.role;
+  const roleLabel = user?.role === 'officer' ? user.department?.name || 'Officer' : user?.role === 'superadmin' ? 'Platform admin' : user?.role;
 
   const appLinks = [
     { to: '/', label: 'Home', icon: House },
@@ -110,6 +111,17 @@ export default function Navbar() {
           <motion.span className="brand-mark" whileHover={{ rotate: -8, scale: 1.06 }}>✓</motion.span>
           <span>ClearPath</span>
         </Link>
+
+        {/* The portal you are in: your university's logo and name */}
+        {user?.university && (
+          <div className="nav-uni" title={user.university.name}>
+            <UniLogo university={user.university} size={30} />
+            <span className="name">{user.university.shortName}</span>
+          </div>
+        )}
+        {user?.role === 'superadmin' && (
+          <div className="nav-uni"><span className="name">Platform administration</span></div>
+        )}
 
         <nav className="nav-links" aria-label="Main">
           {landing

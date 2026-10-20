@@ -13,10 +13,13 @@ const userSchema = new mongoose.Schema(
       match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email'],
     },
     password: { type: String, required: true, minlength: 6, select: false },
-    role: { type: String, enum: ['student', 'officer', 'admin'], default: 'student' },
+    role: { type: String, enum: ['student', 'officer', 'admin', 'superadmin'], default: 'student' },
+
+    // Which university this account belongs to (empty only for the platform admin)
+    university: { type: mongoose.Schema.Types.ObjectId, ref: 'University', index: true },
 
     // Student-only fields
-    regNo: { type: String, trim: true, uppercase: true, sparse: true, unique: true },
+    regNo: { type: String, trim: true, uppercase: true },
     faculty: { type: String, trim: true },
     phone: { type: String, trim: true },
 
@@ -37,6 +40,9 @@ userSchema.pre('save', async function hashPassword() {
   if (!this.isModified('password')) return;
   this.password = await bcrypt.hash(this.password, 10);
 });
+
+// A registration number is unique inside one university (two universities may reuse the same number)
+userSchema.index({ university: 1, regNo: 1 }, { unique: true, partialFilterExpression: { regNo: { $type: 'string' } } });
 
 userSchema.methods.matchPassword = function matchPassword(plain) {
   return bcrypt.compare(plain, this.password);

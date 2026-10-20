@@ -15,6 +15,7 @@ const itemSchema = new mongoose.Schema(
 const clearanceRequestSchema = new mongoose.Schema(
   {
     student: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    university: { type: mongoose.Schema.Types.ObjectId, ref: 'University', index: true },
     reason: {
       type: String,
       enum: ['graduation', 'transfer', 'withdrawal', 'other'],

@@ -11,7 +11,8 @@ import { EASE, item, Reveal, stagger } from '../components/Page';
 import ProductMock from '../components/ProductMock';
 import { Magnetic } from '../components/Cursor';
 import { SiteFooter } from '../components/Footer';
-import { Badge, CountUp, deptIcon, ProgressRing, Tabs } from '../components/ui';
+import { Badge, CountUp, deptIcon, ProgressRing, Tabs, UniLogo } from '../components/ui';
+import api from '../api';
 
 /* ------------------------------------------------------------------ */
 /* Content                                                             */
@@ -71,8 +72,8 @@ const SECURITY = [
 ];
 
 const FAQS = [
-  ['Who can use ClearPath?', 'ClearPath runs for one university. Only students on that university’s official student list can create an account, using their own university email and a one-time verification code. Department officers and administrators are added by the university administrator.'],
-  ['Can a student from another university sign up?', 'No. Registration checks the registration number against the university’s official list, only accepts the university’s email domain, and sends a code to that email to prove it belongs to the student.'],
+  ['Who can use ClearPath?', 'Students and staff of Sri Lanka’s state universities. Each university has its own portal: your university email (for example name@ruh.ac.lk) decides which one you enter. Only students on their university’s official student list can create an account, and officers and admins are added by their own university.'],
+  ['Can a student from one university get into another university’s portal?', 'No. The email domain decides the portal, the registration number must be on that university’s own student list, and a one-time code sent to the email proves it belongs to the student. Each university only ever sees its own students, departments and dues.'],
   ['Do I still need to visit any offices?', 'Only if you choose to pay a due in person. Requesting clearance, tracking it, uploading receipts and downloading your certificate all happen online.'],
   ['What happens if a department finds a due?', 'Your tracker shows “Dues found” with the reason and amount. Pay it, upload the receipt, and the officer verifies it and clears you — only that department needs to act again.'],
   ['How long does clearance take?', 'It depends on how quickly each office reviews, but all departments work in parallel, so you are never waiting for one office to pass a paper form to the next.'],
@@ -306,19 +307,37 @@ function Hero() {
   );
 }
 
-function DepartmentsMarquee() {
-  const items = [...DEPARTMENTS, ...DEPARTMENTS];
-  return (
-    <div className="logos">
-      <p className="marquee-label">Every office that signs your clearance — in one place</p>
-      <div className="marquee">
-        <div className="marquee-track">
+// Every state university on ClearPath, with its logo (or initials until a logo is uploaded)
+function UniversitiesMarquee() {
+  const [unis, setUnis] = useState([]);
+  useEffect(() => {
+    api.get('/universities').then((r) => setUnis(r.data)).catch(() => setUnis([]));
+  }, []);
+
+  // Fall back to the departments if the server can't be reached
+  if (!unis.length) {
+    const items = [...DEPARTMENTS, ...DEPARTMENTS];
+    return (
+      <div className="logos">
+        <p className="marquee-label">Every office that signs your clearance — in one place</p>
+        <div className="marquee"><div className="marquee-track">
           {items.map(([code, name], i) => {
             const Icon = deptIcon(code);
             return <span key={`${code}-${i}`} className="marquee-item"><Icon size={20} /> {name}</span>;
           })}
-        </div>
+        </div></div>
       </div>
+    );
+  }
+  const items = [...unis, ...unis];
+  return (
+    <div className="logos" id="universities">
+      <p className="marquee-label">One platform for {unis.length} state universities in Sri Lanka — each with its own portal</p>
+      <div className="marquee"><div className="marquee-track">
+        {items.map((u, i) => (
+          <span key={`${u.id}-${i}`} className="marquee-item"><UniLogo university={u} size={30} /> {u.shortName}</span>
+        ))}
+      </div></div>
     </div>
   );
 }
@@ -678,7 +697,7 @@ export default function Landing() {
   return (
     <>
       <Hero />
-      <DepartmentsMarquee />
+      <UniversitiesMarquee />
       <WhySection />
       <HowItWorks />
       <Features />

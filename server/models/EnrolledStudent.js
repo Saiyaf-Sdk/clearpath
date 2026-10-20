@@ -4,7 +4,8 @@ const mongoose = require('mongoose');
 // A student can only create a ClearPath account if their registration number + university email are on this list.
 const enrolledStudentSchema = new mongoose.Schema(
   {
-    regNo: { type: String, required: [true, 'Registration number is required'], unique: true, uppercase: true, trim: true },
+    university: { type: mongoose.Schema.Types.ObjectId, ref: 'University', required: true },
+    regNo: { type: String, required: [true, 'Registration number is required'], uppercase: true, trim: true },
     email: { type: String, required: [true, 'Email is required'], lowercase: true, trim: true, match: [/^\S+@\S+\.\S+$/, 'Invalid email'] },
     name: { type: String, required: [true, 'Name is required'], trim: true },
     faculty: { type: String, trim: true },
@@ -21,6 +22,7 @@ const enrolledStudentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+enrolledStudentSchema.index({ university: 1, regNo: 1 }, { unique: true });
 enrolledStudentSchema.index({ email: 1 });
 
 module.exports = mongoose.model('EnrolledStudent', enrolledStudentSchema);

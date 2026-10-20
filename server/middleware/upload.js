@@ -24,3 +24,23 @@ const upload = multer({
 });
 
 module.exports = upload;
+
+// University logos (platform admin): PNG or JPG, max 1 MB – these formats also work in the PDF certificate
+const logoDir = path.join(__dirname, '..', 'uploads', 'logos');
+const logoUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      require('fs').mkdirSync(logoDir, { recursive: true });
+      cb(null, logoDir);
+    },
+    filename: (req, file, cb) => cb(null, `logo-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${path.extname(file.originalname).toLowerCase()}`),
+  }),
+  limits: { fileSize: 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!['.png', '.jpg', '.jpeg'].includes(ext)) return cb(new ApiError(400, 'Logo must be a PNG or JPG file'));
+    cb(null, true);
+  },
+});
+
+module.exports.logoUpload = logoUpload;

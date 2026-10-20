@@ -1,0 +1,271 @@
+import { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import toast from 'react-hot-toast';
+import { Building2, Globe, GraduationCap, ImageUp, Plus, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
+import api, { errMsg } from '../../api';
+import { useDialog } from '../../context/DialogContext';
+import { item, stagger } from '../../components/Page';
+import { Badge, Drawer, Empty, PageSkeleton, Spin, StatCard, UniLogo } from '../../components/ui';
+
+const emptyUni = { name: '', shortName: '', code: '', domains: '', website: '' };
+
+/*
+  Platform admin: manages the universities on ClearPath.
+  - each university's email domains (decide which portal an email opens)
+  - its logo (official file provided by the university)
+  - its first university admin, who then sets up departments, officers and the student list
+*/
+export default function PlatformDashboard() {
+  const { confirm } = useDialog();
+  const [unis, setUnis] = useState(null);
+  const [search, setSearch] = useState('');
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState(emptyUni);
+  const [selected, setSelected] = useState(null);
+
+  const load = () => api.get('/platform/universities').then((r) => setUnis(r.data)).catch((e) => toast.error(errMsg(e)));
+  useEffect(() => { load(); }, []);
+
+  if (!unis) return <PageSkeleton />;
+
+  const q = search.toLowerCase();
+  const shown = unis.filter((u) => !q || u.name.toLowerCase().includes(q) || u.code.toLowerCase().includes(q) || u.domains.some((d) => d.includes(q)));
+  const totals = unis.reduce((t, u) => ({ students: t.students + u.stats.students, admins: t.admins + u.stats.admins }), { students: 0, admins: 0 });
+  const live = unis.filter((u) => u.stats.admins > 0).length;
+
+  const addUni = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/platform/universities', { ...form, domains: form.domains.split(',') });
+      toast.success(`${form.name} added`);
+      setForm(emptyUni);
+      setShowAdd(false);
+      load();
+    } catch (err) {
+      toast.error(errMsg(err));
+    }
+  };
+
+  const toggle = async (u) => {
+    if (u.isActive) {
+      const ok = await confirm({ title: `Deactivate ${u.name}?`, message: 'Its users will not be able to log in until it is activated again.', confirmText: 'Deactivate', tone: 'danger' });
+      if (!ok) return;
+    }
+    try {
+      await api.patch(`/platform/universities/${u._id}`, { isActive: !u.isActive });
+      load();
+    } catch (err) {
+      toast.error(errMsg(err));
+    }
+  };
+
+  return (
+    <div className="dashboard">
+      <div className="page-head">
+        <div>
+          <span className="eyebrow"><ShieldCheck size={14} /> Platform administration</span>
+          <h1>Universities on ClearPath</h1>
+          <p className="muted">Each university gets its own portal. A user's email domain decides which portal they enter.</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => setShowAdd((s) => !s)}><Plus size={16} /> Add university</button>
+      </div>
+
+      <motion.div className="stats" variants={stagger} initial="hidden" animate="show">
+        <motion.div variants={item}><StatCard icon={Building2} label="Universities" value={unis.length} /></motion.div>
+        <motion.div variants={item}><StatCard icon={Globe} tone="good" label="Portals with an admin" value={live} /></motion.div>
+        <motion.div variants={item}><StatCard icon={GraduationCap} label="Student accounts" value={totals.students} /></motion.div>
+        <motion.div variants={item}><StatCard icon={Users} label="University admins" value={totals.admins} /></motion.div>
+      </motion.div>
+
+      <AnimatePresence initial={false}>
+        {showAdd && (
+          <motion.section className="card" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>
+            <h2>Add a university</h2>
+            <form className="grid-3" style={{ marginTop: 14 }} onSubmit={addUni}>
+              <label className="label">Full name<input className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
+              <label className="label">Short name<input className="input" value={form.shortName} onChange={(e) => setForm({ ...form, shortName: e.target.value })} placeholder="Shown in the top bar" /></label>
+              <label className="label">Code<input className="input" required maxLength={6} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="e.g. UOR" /></label>
+              <label className="label span-2">Email domains (comma separated)<input className="input" required value={form.domains} onChange={(e) => setForm({ ...form, domains: e.target.value })} placeholder="ruh.ac.lk" /></label>
+              <label className="label">Website<input className="input" value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} /></label>
+              <div className="row-gap"><button className="btn btn-primary">Add</button><button type="button" className="btn btn-ghost" onClick={() => setShowAdd(false)}>Cancel</button></div>
+            </form>
+          </motion.section>
+        )}
+      </AnimatePresence>
+
+      <section className="card">
+        <div className="toolbar">
+          <div className="search-box">
+            <Search size={16} />
+            <input className="input" placeholder="Search name, code or domain" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          <span className="muted small" style={{ marginLeft: 'auto' }}>Click a university to edit its domains, logo and admins</span>
+        </div>
+        {shown.length === 0 ? <Empty icon={Building2} title="No universities match" /> : (
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>University</th><th>Email domains</th><th>Students</th><th>Admins</th><th>Status</th><th /></tr></thead>
+              <tbody>
+                {shown.map((u) => (
+                  <tr key={u._id} style={{ cursor: 'pointer' }} onClick={() => setSelected(u._id)}>
+                    <td>
+                      <div className="person">
+                        <UniLogo university={u} size={38} />
+                        <div><strong>{u.name}</strong><small>{u.code}</small></div>
+                      </div>
+                    </td>
+                    <td className="small">{u.domains.map((d) => `@${d}`).join(', ')}</td>
+                    <td>{u.stats.students}<div className="muted small">{u.stats.onList} on list</div></td>
+                    <td>{u.stats.admins}</td>
+                    <td><Badge status={u.isActive ? 'active' : 'inactive'} /></td>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <button className="btn btn-ghost btn-sm" onClick={() => toggle(u)}>{u.isActive ? 'Deactivate' : 'Activate'}</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <UniversityDrawer uni={unis.find((u) => u._id === selected)} onClose={() => setSelected(null)} onChanged={load} />
+    </div>
+  );
+}
+
+function UniversityDrawer({ uni, onClose, onChanged }) {
+  const { confirm } = useDialog();
+  const [edit, setEdit] = useState(emptyUni);
+  const [admins, setAdmins] = useState([]);
+  const [adminForm, setAdminForm] = useState({ name: '', email: '', password: '' });
+  const [busy, setBusy] = useState('');
+
+  useEffect(() => {
+    if (!uni) return;
+    setEdit({ name: uni.name, shortName: uni.shortName || '', code: uni.code, domains: uni.domains.join(', '), website: uni.website || '' });
+    setAdminForm({ name: '', email: '', password: '' });
+    api.get(`/platform/universities/${uni._id}/admins`).then((r) => setAdmins(r.data)).catch(() => setAdmins([]));
+  }, [uni?._id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const save = async (e) => {
+    e.preventDefault();
+    setBusy('save');
+    try {
+      await api.patch(`/platform/universities/${uni._id}`, { ...edit, domains: edit.domains.split(',') });
+      toast.success('Saved');
+      onChanged();
+    } catch (err) {
+      toast.error(errMsg(err));
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const uploadLogo = async (file) => {
+    if (!file) return;
+    if (file.size > 1024 * 1024) return toast.error('Logo must be smaller than 1 MB');
+    const data = new FormData();
+    data.append('logo', file);
+    setBusy('logo');
+    try {
+      await api.post(`/platform/universities/${uni._id}/logo`, data);
+      toast.success('Logo updated');
+      onChanged();
+    } catch (err) {
+      toast.error(errMsg(err));
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const removeLogo = async () => {
+    const ok = await confirm({ title: 'Remove this logo?', message: 'The initials badge will be shown instead.', confirmText: 'Remove', tone: 'danger' });
+    if (!ok) return;
+    try {
+      await api.delete(`/platform/universities/${uni._id}/logo`);
+      onChanged();
+    } catch (err) {
+      toast.error(errMsg(err));
+    }
+  };
+
+  const addAdmin = async (e) => {
+    e.preventDefault();
+    setBusy('admin');
+    try {
+      const { data } = await api.post(`/platform/universities/${uni._id}/admins`, adminForm);
+      setAdmins((a) => [...a, data]);
+      setAdminForm({ name: '', email: '', password: '' });
+      toast.success(`${data.name} can now manage ${uni.shortName || uni.name}`);
+      onChanged();
+    } catch (err) {
+      toast.error(errMsg(err));
+    } finally {
+      setBusy('');
+    }
+  };
+
+  return (
+    <Drawer open={!!uni} onClose={onClose} title={uni?.name} subtitle={uni && `${uni.code} · ${uni.domains.map((d) => '@' + d).join(', ')}`}>
+      {uni && (
+        <>
+          <div>
+            <div className="section-title">Logo</div>
+            <div className="row-gap" style={{ gap: 14 }}>
+              <UniLogo university={uni} size={72} />
+              <div className="row-gap">
+                <label className="btn btn-soft btn-sm" style={{ cursor: 'pointer' }}>
+                  {busy === 'logo' ? <Spin /> : <ImageUp size={15} />} Upload logo
+                  <input type="file" accept=".png,.jpg,.jpeg" hidden onChange={(e) => { uploadLogo(e.target.files[0]); e.target.value = ''; }} />
+                </label>
+                {uni.logoUrl && <button className="btn btn-ghost btn-sm" onClick={removeLogo}><Trash2 size={14} /> Remove</button>}
+              </div>
+            </div>
+            <p className="muted small" style={{ marginTop: 8 }}>Use the official logo file provided by the university (PNG or JPG, square works best, max 1 MB). It appears in the portal, on certificates and on the verify page.</p>
+          </div>
+
+          <form onSubmit={save}>
+            <div className="section-title">Details</div>
+            <div className="auth-form-stack" style={{ gap: 10 }}>
+              <label className="label">Full name<input className="input" required value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></label>
+              <div className="grid-2">
+                <label className="label">Short name<input className="input" value={edit.shortName} onChange={(e) => setEdit({ ...edit, shortName: e.target.value })} /></label>
+                <label className="label">Code<input className="input" required maxLength={6} value={edit.code} onChange={(e) => setEdit({ ...edit, code: e.target.value })} /></label>
+              </div>
+              <label className="label">Email domains (comma separated)<input className="input" required value={edit.domains} onChange={(e) => setEdit({ ...edit, domains: e.target.value })} /></label>
+              <small className="muted">Sub-domains match automatically: ruh.ac.lk also covers stu.ruh.ac.lk.</small>
+              <label className="label">Website<input className="input" value={edit.website} onChange={(e) => setEdit({ ...edit, website: e.target.value })} /></label>
+              <div><button className="btn btn-primary btn-sm" disabled={busy === 'save'}>{busy === 'save' ? <Spin /> : null} Save changes</button></div>
+            </div>
+          </form>
+
+          <div>
+            <div className="section-title">University admins</div>
+            {admins.length === 0 ? (
+              <p className="muted small">No admin yet. Add the registrar or Student Affairs contact so they can set up departments, officers and the student list.</p>
+            ) : (
+              <div className="row-list" style={{ marginBottom: 12 }}>
+                {admins.map((a) => (
+                  <div key={a._id} className="officer-row">
+                    <span className="avatar">{a.name.split(' ').map((p) => p[0]).slice(0, 2).join('')}</span>
+                    <div className="grow"><strong>{a.name}</strong><small>{a.email}</small></div>
+                    <Badge status={a.isActive ? 'active' : 'inactive'} />
+                  </div>
+                ))}
+              </div>
+            )}
+            <form className="auth-form-stack" style={{ gap: 10, marginTop: 10 }} onSubmit={addAdmin}>
+              <div className="grid-2">
+                <input className="input" required placeholder="Full name" value={adminForm.name} onChange={(e) => setAdminForm({ ...adminForm, name: e.target.value })} />
+                <input className="input" required type="email" placeholder={`name@${uni.domains[0] || 'university.ac.lk'}`} value={adminForm.email} onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })} />
+              </div>
+              <input className="input" required minLength={6} placeholder="Temporary password (they can change it later)" value={adminForm.password} onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })} />
+              <div><button className="btn btn-soft btn-sm" disabled={busy === 'admin'}>{busy === 'admin' ? <Spin /> : <UserPlus size={15} />} Add university admin</button></div>
+            </form>
+          </div>
+        </>
+      )}
+    </Drawer>
+  );
+}

@@ -7,16 +7,18 @@ import { homeFor, useAuth } from '../context/AuthContext';
 import { errMsg } from '../api';
 import { Field, Spin } from '../components/ui';
 import AuthLayout, { FormError } from '../components/AuthLayout';
+import PortalBanner, { useUniversityFor } from '../components/PortalBanner';
 
 // Demo accounts are only offered while developing, or when VITE_SHOW_DEMO=true is set
 // (e.g. for the project evaluation). They never appear on a normal live deployment.
 const SHOW_DEMO = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEMO === 'true';
 const DEMO = [
-  ['Student', 'kasun@student.lk'],
-  ['Student (no dues)', 'nimali@student.lk'],
-  ['Library officer', 'library@clearpath.lk'],
-  ['Finance officer', 'finance@clearpath.lk'],
-  ['Administrator', 'admin@clearpath.lk'],
+  ['Ruhuna · student', 'demo.kasun@ruh.ac.lk'],
+  ['Ruhuna · library officer', 'demo.lib@ruh.ac.lk'],
+  ['Ruhuna · admin', 'demo.admin@ruh.ac.lk'],
+  ['Colombo · student', 'demo.saman@cmb.ac.lk'],
+  ['Colombo · admin', 'demo.admin@cmb.ac.lk'],
+  ['Platform admin', 'platform@clearpath.lk'],
 ];
 
 export default function Login() {
@@ -29,6 +31,7 @@ export default function Login() {
   const [busy, setBusy] = useState(false);
   const [shake, setShake] = useState(0);
   const [demoOpen, setDemoOpen] = useState(false);
+  const portal = useUniversityFor(form.email);
 
   const isPresent = useIsPresent();
   if (user && isPresent) return <Navigate to={homeFor(user.role)} replace />;
@@ -60,12 +63,14 @@ export default function Login() {
       >
         <div className="auth-head">
           <h2>Log in</h2>
-          <p>Students, department officers and administrators all sign in here.</p>
+          <p>Sign in with your university email. We'll take you to your university's portal.</p>
         </div>
 
         <AnimatePresence>{error && <FormError><CircleAlert size={16} /> {error}</FormError>}</AnimatePresence>
 
-        <Field icon={Mail} label="Email address" type="email" required autoComplete="email" autoFocus value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        <Field icon={Mail} label="University email" type="email" required autoComplete="email" autoFocus value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        {/* The platform admin uses a ClearPath address, so no warning for that domain */}
+        <PortalBanner lookup={portal} staffHint={form.email.toLowerCase().endsWith('@clearpath.lk')} />
         <Field
           icon={Lock}
           label="Password"

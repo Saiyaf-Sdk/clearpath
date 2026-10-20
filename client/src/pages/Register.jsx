@@ -9,6 +9,8 @@ import api, { errMsg } from '../api';
 import { homeFor, useAuth } from '../context/AuthContext';
 import { Field, PasswordStrength, Spin } from '../components/ui';
 import AuthLayout, { FormError } from '../components/AuthLayout';
+import PortalBanner, { useUniversityFor } from '../components/PortalBanner';
+import { UniLogo } from '../components/ui';
 
 const STEPS = ['Find your record', 'Verify email', 'Set password'];
 const EASE = [0.22, 1, 0.36, 1];
@@ -75,7 +77,6 @@ function CodeInput({ value, onChange, disabled }) {
 export default function Register() {
   const { user, completeRegistration } = useAuth();
   const navigate = useNavigate();
-  const [config, setConfig] = useState({ universityName: '', allowedDomains: [] });
   const [step, setStep] = useState(0);
   const [dir, setDir] = useState(1);
   const [form, setForm] = useState({ regNo: '', email: '', phone: '', password: '', confirm: '' });
@@ -90,20 +91,19 @@ export default function Register() {
   const [cooldown, setCooldown] = useState(0);
 
   useEffect(() => {
-    api.get('/config').then(({ data }) => setConfig(data)).catch(() => {});
-  }, []);
-  useEffect(() => {
     if (!cooldown) return undefined;
     const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
     return () => clearTimeout(t);
   }, [cooldown]);
 
+  // Which university portal this email belongs to (shown live under the email field)
+  const portal = useUniversityFor(form.email);
   const isPresent = useIsPresent();
   if (user && isPresent) return <Navigate to={homeFor(user.role)} replace />;
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   const go = (n) => { setDir(n > step ? 1 : -1); setError(''); setStep(n); };
-  const domains = config.allowedDomains.map((d) => `@${d}`).join(' or ');
+  const uni = student?.university || portal.university;
   const matches = form.confirm && form.confirm === form.password;
 
   const sendCode = async () => {
@@ -173,8 +173,8 @@ export default function Register() {
 
   return (
     <AuthLayout
-      title={config.universityName ? `For students of ${config.universityName}.` : 'Start your clearance.'}
-      text="Create your account with your university details. It takes about two minutes."
+      title={uni ? `Welcome to the ${uni.shortName} portal.` : 'One platform for every state university.'}
+      text={uni ? 'Create your account with your university details. It takes about two minutes.' : "Enter your university email and we'll open your university's portal."}
       points={POINTS}
     >
       <form className="auth-form-stack" onSubmit={submit}>
@@ -215,11 +215,12 @@ export default function Register() {
                   </div>
                   <div>
                     <Field icon={Mail} label="University email" type="email" required autoComplete="email" value={form.email} onChange={set('email')} />
-                    {domains && <small className="field-hint">Use your university email ({domains})</small>}
+                    <small className="field-hint">The email your university gave you, e.g. name@ruh.ac.lk</small>
                   </div>
+                  <PortalBanner lookup={portal} />
                   <div className="policy-note">
                     <Info size={16} />
-                    <span>Only students on the university's official list can register. Your details must match university records.</span>
+                    <span>Only students on {uni ? `the ${uni.shortName}` : "their university's"} official student list can register. Your details must match university records.</span>
                   </div>
                   <button className="btn btn-primary btn-lg btn-block" disabled={busy}>
                     {busy ? <><Spin /> Checking…</> : <>Send verification code <ArrowRight size={18} className="arrow" /></>}
@@ -256,10 +257,11 @@ export default function Register() {
               {step === 2 && student && (
                 <>
                   <motion.div className="identity" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.35, ease: EASE }}>
-                    <span className="avatar">{initials}</span>
+                    {student.university ? <UniLogo university={student.university} size={42} /> : <span className="avatar">{initials}</span>}
                     <div>
                       <strong>{student.name}</strong>
                       <small>{student.regNo} · Faculty of {student.faculty || '—'}</small>
+                      {student.university && <small>{student.university.name}</small>}
                     </div>
                     <span className="verified"><BadgeCheck size={15} /> Verified</span>
                   </motion.div>
@@ -286,7 +288,7 @@ export default function Register() {
                   <button className="btn btn-primary btn-lg btn-block" disabled={busy}>
                     {busy ? <><Spin /> Creating account…</> : <>Create account <ArrowRight size={18} className="arrow" /></>}
                   </button>
-                  <p className="auth-note">Not you? Contact Student Affairs to correct your record.</p>
+                  <p className="auth-note">Not you? Contact your university's Student Affairs office to correct your record.</p>
                 </>
               )}
             </motion.div>

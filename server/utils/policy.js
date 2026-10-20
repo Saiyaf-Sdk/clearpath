@@ -1,22 +1,31 @@
-// University-specific rules, configured in server/.env
+// Finds which university an email belongs to, from its domain.
+// e.g. someone@ruh.ac.lk or someone@stu.ruh.ac.lk -> University of Ruhuna
+const University = require('../models/University');
 
-const universityName = () => process.env.UNIVERSITY_NAME || 'ClearPath University';
+const domainOf = (email) => String(email || '').toLowerCase().trim().split('@')[1] || '';
 
-// e.g. ALLOWED_EMAIL_DOMAINS=student.fortuna.ac.lk,fortuna.ac.lk  (empty = any domain, the student list still applies)
-const allowedDomains = () =>
-  (process.env.ALLOWED_EMAIL_DOMAINS || '')
-    .split(',')
-    .map((d) => d.trim().toLowerCase().replace(/^@/, ''))
-    .filter(Boolean);
-
-const emailAllowed = (email) => {
-  const list = allowedDomains();
-  if (!list.length) return true;
-  const domain = String(email || '').toLowerCase().split('@')[1];
-  return !!domain && list.some((d) => domain === d || domain.endsWith(`.${d}`));
+// "stu.eng.ruh.ac.lk" -> ["stu.eng.ruh.ac.lk", "eng.ruh.ac.lk", "ruh.ac.lk", "ac.lk"]
+const candidates = (domain) => {
+  const parts = domain.split('.');
+  const list = [];
+  for (let i = 0; i < parts.length - 1; i += 1) list.push(parts.slice(i).join('.'));
+  return list;
 };
 
-const domainHint = () => allowedDomains().map((d) => `@${d}`).join(' or ');
+const universityForEmail = async (email) => {
+  const domain = domainOf(email);
+  if (!domain) return null;
+  return University.findOne({ domains: { $in: candidates(domain) }, isActive: true });
+};
+
+const emailBelongsTo = (email, university) => {
+  const domain = domainOf(email);
+  return !!university && candidates(domain).some((d) => university.domains.includes(d));
+};
+
+// Public shape sent to the browser (logo, names) – never internal fields
+const publicUniversity = (u) =>
+  u && { id: u._id, name: u.name, shortName: u.shortName || u.name, code: u.code, domains: u.domains, logoUrl: u.logoUrl || null, website: u.website };
 
 // Show codes/links on screen only in local development without email configured
 const devMode = () => process.env.NODE_ENV !== 'production' && !process.env.SMTP_HOST;
@@ -26,4 +35,4 @@ const maskEmail = (email) => {
   return `${user.slice(0, 2)}${'•'.repeat(Math.max(1, user.length - 2))}@${domain}`;
 };
 
-module.exports = { universityName, allowedDomains, emailAllowed, domainHint, devMode, maskEmail };
+module.exports = { domainOf, universityForEmail, emailBelongsTo, publicUniversity, devMode, maskEmail };

@@ -11,19 +11,27 @@ const signToken = (user) =>
 // Never let logging failures break a request
 const audit = async (actor, action, target, details) => {
   try {
-    await AuditLog.create({ actor: actor?._id || actor, action, target: String(target || ''), details });
+    const university = actor?.university?._id || actor?.university;
+    await AuditLog.create({ actor: actor?._id || actor, university, action, target: String(target || ''), details });
   } catch (err) {
     console.error('Audit log failed:', err.message);
   }
 };
 
 // Create the certificate for a completed request (only once)
-const issueCertificate = async (request) => {
+// Certificate numbers carry the university code, e.g. CP-UOR-2026-8F3A21C9
+const issueCertificate = async (request, universityCode = '') => {
   const existing = await Certificate.findOne({ request: request._id });
   if (existing) return existing;
   const year = new Date().getFullYear();
-  const certificateNo = `CP-${year}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
-  return Certificate.create({ request: request._id, student: request.student._id || request.student, certificateNo });
+  const prefix = universityCode ? `CP-${universityCode}-` : 'CP-';
+  const certificateNo = `${prefix}${year}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+  return Certificate.create({
+    request: request._id,
+    student: request.student._id || request.student,
+    university: request.university,
+    certificateNo,
+  });
 };
 
 module.exports = { signToken, audit, issueCertificate };

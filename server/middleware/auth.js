@@ -14,8 +14,11 @@ const protect = asyncHandler(async (req, res, next) => {
     throw new ApiError(401, 'Session expired, please log in again');
   }
 
-  const user = await User.findById(decoded.id).populate('department', 'name code');
+  const user = await User.findById(decoded.id).populate('department', 'name code').populate('university');
   if (!user || !user.isActive) throw new ApiError(401, 'Account not found or disabled');
+  if (user.role !== 'superadmin' && user.university && !user.university.isActive) {
+    throw new ApiError(403, 'Your university is not active on ClearPath');
+  }
   req.user = user;
   next();
 });
@@ -29,3 +32,8 @@ const authorize = (...roles) => (req, res, next) => {
 };
 
 module.exports = { protect, authorize };
+
+// The university id of the signed-in user – every query is limited to it
+const uniOf = (req) => req.user.university?._id || req.user.university;
+
+module.exports.uniOf = uniOf;

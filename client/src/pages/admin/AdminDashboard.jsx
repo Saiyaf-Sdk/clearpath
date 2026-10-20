@@ -11,9 +11,10 @@ import {
 } from 'lucide-react';
 import api, { errMsg } from '../../api';
 import { useDialog } from '../../context/DialogContext';
+import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { item, stagger } from '../../components/Page';
-import { Badge, cap, Empty, fmtDate, lkr, PageSkeleton, Skeleton, StatCard, Tabs } from '../../components/ui';
+import { Badge, cap, Empty, fmtDate, lkr, PageSkeleton, Skeleton, StatCard, Tabs, UniLogo } from '../../components/ui';
 
 const TABS = [
   { value: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -31,13 +32,17 @@ const initials = (name = '') => name.split(' ').map((p) => p[0]).slice(0, 2).joi
 const fade = { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -6 }, transition: { duration: 0.22 } };
 
 export default function AdminDashboard() {
+  const { user } = useAuth();
   const [tab, setTab] = useState('overview');
   return (
     <div className="dashboard">
       <div className="page-head">
         <div>
           <span className="eyebrow"><ShieldCheck size={13} /> Admin console</span>
-          <h1>University clearance overview</h1>
+          <div className="row-gap" style={{ gap: 12, marginBottom: 4 }}>
+            <UniLogo university={user.university} size={44} />
+            <h1 style={{ margin: 0 }}>{user.university?.name || 'University'}</h1>
+          </div>
           <p className="muted">Manage departments and staff, and see where students are waiting.</p>
         </div>
       </div>
@@ -525,12 +530,12 @@ function Roster() {
   const [result, setResult] = useState(null);
   const [importing, setImporting] = useState(false);
   const [form, setForm] = useState({ regNo: '', name: '', email: '', faculty: '' });
-  const [domains, setDomains] = useState([]);
+  const { user } = useAuth();
+  const domains = user.university?.domains || [];
 
   const load = () => api.get('/admin/roster', { params: { search: search || undefined, status: status || undefined } })
     .then((r) => setData(r.data)).catch((e) => toast.error(errMsg(e)));
   useEffect(() => { load(); }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { api.get('/config').then((r) => setDomains(r.data.allowedDomains || [])).catch(() => {}); }, []);
 
   const onFile = async (file) => {
     if (!file) return;

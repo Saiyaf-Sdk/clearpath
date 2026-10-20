@@ -5,6 +5,8 @@ const User = require('../models/User');
 const ClearanceRequest = require('../models/ClearanceRequest');
 const { asyncHandler, ApiError } = require('../middleware/error');
 const { audit } = require('../utils/helpers');
+const { uniOf } = require('../middleware/auth');
+const Department = require('../models/Department');
 const { sendMail } = require('../utils/mailer');
 
 // When a due is added, mark the department item on any active request as "dues"
@@ -33,7 +35,7 @@ exports.getMyDues = asyncHandler(async (req, res) => {
 exports.getDepartmentDues = asyncHandler(async (req, res) => {
   const deptId = deptOf(req);
   if (!deptId) throw new ApiError(400, 'No department assigned');
-  const filter = { department: deptId };
+  const filter = { department: deptId, university: uniOf(req) };
   if (req.query.status) filter.status = req.query.status;
   const dues = await Due.find(filter).populate('student', 'name regNo email faculty').sort('-updatedAt');
   res.json(dues);
@@ -46,10 +48,12 @@ exports.addDue = asyncHandler(async (req, res) => {
   const { regNo, amount, description } = req.body;
   if (!regNo || amount === undefined || !description) throw new ApiError(400, 'Registration number, amount and description are required');
 
-  const student = await User.findOne({ regNo: String(regNo).toUpperCase().trim(), role: 'student' });
+  if (!(await Department.exists({ _id: deptId, university: uniOf(req) }))) throw new ApiError(404, 'Department not found');
+  // Look the student up inside this university only
+  const student = await User.findOne({ regNo: String(regNo).toUpperCase().trim(), role: 'student', university: uniOf(req) });
   if (!student) throw new ApiError(404, `No student found with registration number ${regNo}`);
 
-  const due = await Due.create({ student: student._id, department: deptId, amount: Number(amount), description, addedBy: req.user._id });
+  const due = await Due.create({ student: student._id, department: deptId, university: uniOf(req), amount: Number(amount), description, addedBy: req.user._id });
   await flagActiveRequest(student._id, deptId, `Due added: ${description}`);
   await audit(req.user, 'DUE_ADDED', due._id, `${student.regNo}: ${description} (LKR ${amount})`);
   await sendMail(student.email, 'ClearPath: New due added', `A due of LKR ${amount} was added: ${description}. Log in to ClearPath to pay and upload your receipt.`);
@@ -83,7 +87,7 @@ exports.uploadReceipt = asyncHandler(async (req, res) => {
 
 // PATCH /api/dues/:id/verify  body: { approve: true|false, note }  (officer)
 exports.verifyDue = asyncHandler(async (req, res) => {
-  const due = await Due.findById(req.params.id).populate('student', 'name email regNo');
+  const due = await Due.findOne({ _id: req.params.id, university: uniOf(req) }).populate('student', 'name email regNo');
   if (!due) throw new ApiError(404, 'Due not found');
   if (req.user.role === 'officer' && String(due.department) !== String(req.user.department?._id)) {
     throw new ApiError(403, 'This due belongs to another department');
@@ -114,7 +118,7 @@ exports.verifyDue = asyncHandler(async (req, res) => {
 
 // DELETE /api/dues/:id  (officer - remove a due added by mistake)
 exports.deleteDue = asyncHandler(async (req, res) => {
-  const due = await Due.findById(req.params.id);
+  const due = await Due.findOne({ _id: req.params.id, university: uniOf(req) });
   if (!due) throw new ApiError(404, 'Due not found');
   if (req.user.role === 'officer' && String(due.department) !== String(req.user.department?._id)) {
     throw new ApiError(403, 'This due belongs to another department');

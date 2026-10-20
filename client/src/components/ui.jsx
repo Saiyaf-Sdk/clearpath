@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { API_URL } from '../api';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   BedDouble, BookOpen, Building2, CircleCheck, CircleX, Clock, FileUp, FlaskConical, Hourglass, Landmark,
@@ -293,5 +294,23 @@ export function PasswordStrength({ value }) {
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+/* ---------- university logo ---------- */
+// Shows the university's uploaded logo, or a clean initials badge until one is uploaded.
+const initialsOf = (u) =>
+  (u?.code && u.code.length <= 5 ? u.code : (u?.shortName || u?.name || '?').split(' ').filter((w) => /^[A-Z]/.test(w)).map((w) => w[0]).join(''))
+    .slice(0, 5)
+    .toUpperCase();
+
+export function UniLogo({ university, size = 36 }) {
+  const [broken, setBroken] = useState(false);
+  if (!university) return null;
+  const src = university.logoUrl && !broken ? (university.logoUrl.startsWith('http') ? university.logoUrl : `${API_URL}${university.logoUrl}`) : null;
+  return (
+    <span className={`uni-logo ${src ? 'has-img' : ''}`} style={{ width: size, height: size, fontSize: Math.max(9, size * 0.28) }} title={university.name}>
+      {src ? <img src={src} alt={`${university.name} logo`} onError={() => setBroken(true)} /> : initialsOf(university)}
+    </span>
   );
 }

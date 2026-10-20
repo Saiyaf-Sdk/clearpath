@@ -1,18 +1,20 @@
 // Fills the database with demo data. Run: npm run seed
-// WARNING: deletes all existing ClearPath data first.
+// WARNING: deletes the whole ClearPath database first.
+//
+// Demo accounts use "demo." addresses at real university domains so the right portal opens.
+// Keep SMTP empty while using them, so no email is ever sent to those addresses.
 require('dotenv').config();
 const mongoose = require('mongoose');
+const University = require('./models/University');
 const User = require('./models/User');
 const Department = require('./models/Department');
-const ClearanceRequest = require('./models/ClearanceRequest');
 const Due = require('./models/Due');
-const Certificate = require('./models/Certificate');
-const AuditLog = require('./models/AuditLog');
 const EnrolledStudent = require('./models/EnrolledStudent');
+const UNIVERSITIES = require('./data/universities');
 
 const PASSWORD = 'password123';
 
-const departments = [
+const DEPARTMENTS = [
   { name: 'Library', code: 'LIB', description: 'Books and library fines', order: 1 },
   { name: 'Hostel', code: 'HOS', description: 'Room keys, damages, hostel fees', order: 2 },
   { name: 'Finance Division', code: 'FIN', description: 'Tuition and other fees', order: 3 },
@@ -21,58 +23,74 @@ const departments = [
   { name: 'Student Affairs', code: 'SAF', description: 'ID card return and disciplinary clearance', order: 6 },
 ];
 
-(async () => {
-  await mongoose.connect(process.env.MONGO_URI);
-  console.log('Connected. Clearing old data...');
-  await Promise.all([User, Department, ClearanceRequest, Due, Certificate, AuditLog, EnrolledStudent].map((m) => m.deleteMany({})));
-
-  const depts = await Department.insertMany(departments);
+// Sets up one demo university: departments, admin, officers, students and its official student list
+async function demoUniversity(code, domain, { skipDepts = [], students, pending }) {
+  const uni = await University.findOne({ code });
+  const depts = await Department.insertMany(
+    DEPARTMENTS.filter((d) => !skipDepts.includes(d.code)).map((d) => ({ ...d, university: uni._id }))
+  );
   const byCode = Object.fromEntries(depts.map((d) => [d.code, d]));
 
-  // .create() (not insertMany) so the password hashing hook runs
-  await User.create({ name: 'System Admin', email: 'admin@clearpath.lk', password: PASSWORD, role: 'admin' });
-
-  const officerData = [
-    ['Library Officer', 'library@clearpath.lk', 'LIB'],
-    ['Hostel Warden', 'hostel@clearpath.lk', 'HOS'],
-    ['Finance Officer', 'finance@clearpath.lk', 'FIN'],
-    ['Lab In-charge', 'lab@clearpath.lk', 'LAB'],
-    ['Sports Officer', 'sports@clearpath.lk', 'SPO'],
-    ['Student Affairs Officer', 'affairs@clearpath.lk', 'SAF'],
-  ];
-  for (const [name, email, code] of officerData) {
-    await User.create({ name, email, password: PASSWORD, role: 'officer', department: byCode[code]._id });
+  await User.create({ name: `${uni.shortName} Admin`, email: `demo.admin@${domain}`, password: PASSWORD, role: 'admin', university: uni._id });
+  for (const d of depts) {
+    await User.create({
+      name: `${d.name} Officer`, email: `demo.${d.code.toLowerCase()}@${domain}`, password: PASSWORD,
+      role: 'officer', university: uni._id, department: d._id,
+    });
   }
 
-  // Official student list (normally imported by the admin from the registrar's CSV)
-  await EnrolledStudent.insertMany([
-    { regNo: 'EG/2021/4501', email: 'kasun@student.lk', name: 'Kasun Perera', faculty: 'Engineering', status: 'activated', activatedAt: new Date() },
-    { regNo: 'EG/2021/4502', email: 'nimali@student.lk', name: 'Nimali Fernando', faculty: 'Engineering', status: 'activated', activatedAt: new Date() },
-    { regNo: 'EG/2021/4519', email: 'amal@student.lk', name: 'Amal Silva', faculty: 'Engineering' },
-    { regNo: 'SC/2021/1033', email: 'dilini@student.lk', name: 'Dilini Jayasinghe', faculty: 'Science' },
-    { regNo: 'MG/2022/0210', email: 'tharindu@student.lk', name: 'Tharindu Bandara', faculty: 'Management' },
-  ]);
+  const created = [];
+  for (const s of students) {
+    await EnrolledStudent.create({ ...s, university: uni._id, status: 'activated', activatedAt: new Date() });
+    created.push(await User.create({ ...s, password: PASSWORD, role: 'student', university: uni._id }));
+  }
+  await EnrolledStudent.insertMany(pending.map((p) => ({ ...p, university: uni._id })));
+  return { uni, byCode, created };
+}
 
-  const s1 = await User.create({
-    name: 'Kasun Perera', email: 'kasun@student.lk', password: PASSWORD, role: 'student',
-    regNo: 'EG/2021/4501', faculty: 'Engineering',
-  });
-  await User.create({
-    name: 'Nimali Fernando', email: 'nimali@student.lk', password: PASSWORD, role: 'student',
-    regNo: 'EG/2021/4502', faculty: 'Engineering',
-  });
+(async () => {
+  await mongoose.connect(process.env.MONGO_URI);
+  console.log('Connected. Resetting the database...');
+  await mongoose.connection.dropDatabase(); // also removes old indexes
+  await Promise.all([University, User, Department, Due, EnrolledStudent].map((m) => m.syncIndexes()));
 
-  // Kasun owes the library money, so his Library item will start as "dues"
+  await University.insertMany(UNIVERSITIES);
+  console.log(`Added ${UNIVERSITIES.length} universities.`);
+
+  // Platform admin (manages universities, logos and university admins)
+  await User.create({ name: 'ClearPath Platform Admin', email: 'platform@clearpath.lk', password: PASSWORD, role: 'superadmin' });
+
+  // University of Ruhuna demo
+  const ruh = await demoUniversity('UOR', 'ruh.ac.lk', {
+    students: [
+      { name: 'Kasun Perera', email: 'demo.kasun@ruh.ac.lk', regNo: 'EG/2021/4501', faculty: 'Engineering' },
+      { name: 'Nimali Fernando', email: 'demo.nimali@ruh.ac.lk', regNo: 'EG/2021/4502', faculty: 'Engineering' },
+    ],
+    pending: [
+      { name: 'Amal Silva', email: 'demo.amal@ruh.ac.lk', regNo: 'EG/2021/4519', faculty: 'Engineering' },
+      { name: 'Dilini Jayasinghe', email: 'demo.dilini@ruh.ac.lk', regNo: 'SC/2021/1033', faculty: 'Science' },
+    ],
+  });
   await Due.create({
-    student: s1._id, department: byCode.LIB._id, amount: 450,
+    student: ruh.created[0]._id, department: ruh.byCode.LIB._id, university: ruh.uni._id, amount: 450,
     description: 'Overdue book: Digital Signal Processing (12 days)',
   });
 
+  // University of Colombo demo (no hostel department – each university sets up its own offices).
+  // Saman has the SAME registration number as Kasun: numbers only need to be unique inside one university.
+  await demoUniversity('UOC', 'cmb.ac.lk', {
+    skipDepts: ['HOS'],
+    students: [{ name: 'Saman Kumara', email: 'demo.saman@cmb.ac.lk', regNo: 'EG/2021/4501', faculty: 'Science' }],
+    pending: [{ name: 'Ruwan Wijesinghe', email: 'demo.ruwan@cmb.ac.lk', regNo: 'SC/2021/2001', faculty: 'Science' }],
+  });
+
   console.log('\nSeed complete. All passwords:', PASSWORD);
-  console.log('Admin:    admin@clearpath.lk');
-  console.log('Officers: library@ / hostel@ / finance@ / lab@ / sports@ / affairs@clearpath.lk');
-  console.log('Students: kasun@student.lk (has a library due), nimali@student.lk (no dues)');
-  console.log('Not registered yet (try Create account): EG/2021/4519 amal@student.lk, SC/2021/1033 dilini@student.lk, MG/2022/0210 tharindu@student.lk');
+  console.log('Platform admin: platform@clearpath.lk');
+  console.log('Ruhuna  – admin demo.admin@ruh.ac.lk · officers demo.lib@ / demo.hos@ / demo.fin@ / demo.lab@ / demo.spo@ / demo.saf@ruh.ac.lk');
+  console.log('          students demo.kasun@ruh.ac.lk (library due), demo.nimali@ruh.ac.lk');
+  console.log('          not registered yet: EG/2021/4519 demo.amal@ruh.ac.lk');
+  console.log('Colombo – admin demo.admin@cmb.ac.lk · officers demo.lib@cmb.ac.lk … · student demo.saman@cmb.ac.lk');
+  console.log('          not registered yet: SC/2021/2001 demo.ruwan@cmb.ac.lk');
   await mongoose.disconnect();
 })().catch((err) => {
   console.error(err);
