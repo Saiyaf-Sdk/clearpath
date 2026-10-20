@@ -28,6 +28,8 @@ const STATUS = {
   paid: ['Paid', CircleCheck],
   waived: ['Waived', CircleCheck],
   active: ['Active', CircleCheck],
+  activated: ['Account created', CircleCheck],
+  invited: ['Not registered yet', Clock],
   inactive: ['Inactive', CircleX],
 };
 

@@ -67,7 +67,7 @@ export default function Help() {
               <h2><Rocket size={20} className="text-brand" /> Getting started</h2>
               <p className="muted">ClearPath has three types of accounts. Everyone logs in on the same page.</p>
               <ol className="guide-steps">
-                <li><div><strong>Students</strong>Create your own account from <Link to="/register">Register</Link> using your university email and registration number.</div></li>
+                <li><div><strong>Students</strong>Create your account from <Link to="/register">Create account</Link>. Enter your registration number and university email, type the 6-digit code we email you, then choose a password. Only students on the university's official list can register.</div></li>
                 <li><div><strong>Department officers</strong>Your account is created by the administrator and linked to your department (e.g. Library).</div></li>
                 <li><div><strong>Administrators</strong>Manage departments, staff accounts and the overall process from the admin console.</div></li>
               </ol>
@@ -111,6 +111,7 @@ export default function Help() {
               <ol className="guide-steps">
                 <li><div><strong>Overview</strong>See students, active requests, certificates issued, average days to clear and dues outstanding, plus a chart of where students are waiting.</div></li>
                 <li><div><strong>Departments</strong>Add departments and set their display order. Deactivate a department to stop adding it to new requests.</div></li>
+                <li><div><strong>Student list</strong>Import the registrar's student list (CSV: regNo, name, email, faculty). Only students on this list can create an account.</div></li>
                 <li><div><strong>Users</strong>Create officer accounts (linked to a department), other admins or students. Disable an account instead of deleting it to keep history.</div></li>
                 <li><div><strong>Requests</strong>Filter all requests by status. Click a department chip to override a decision when an office is unavailable.</div></li>
                 <li><div><strong>Audit log</strong>Review the last 100 actions — who did what, and when.</div></li>

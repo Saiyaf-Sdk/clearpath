@@ -5,7 +5,8 @@ import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import {
-  Activity, BadgeCheck, Building2, ClipboardList, Clock, GraduationCap, LayoutDashboard, Plus, Search,
+  Activity, BadgeCheck, Building2, ClipboardList, Clock, Download, FileSpreadsheet, GraduationCap, Info, LayoutDashboard, Plus, Search,
+  Upload,
   ShieldCheck, Trash2, Users, Wallet,
 } from 'lucide-react';
 import api, { errMsg } from '../../api';
@@ -17,6 +18,7 @@ import { Badge, cap, Empty, fmtDate, lkr, PageSkeleton, Skeleton, StatCard, Tabs
 const TABS = [
   { value: 'overview', label: 'Overview', icon: LayoutDashboard },
   { value: 'requests', label: 'Requests', icon: ClipboardList },
+  { value: 'roster', label: 'Student list', icon: FileSpreadsheet },
   { value: 'users', label: 'Users', icon: Users },
   { value: 'departments', label: 'Departments', icon: Building2 },
   { value: 'audit', label: 'Audit log', icon: Activity },
@@ -46,6 +48,7 @@ export default function AdminDashboard() {
           {tab === 'requests' && <Requests />}
           {tab === 'users' && <UsersTab />}
           {tab === 'departments' && <Departments />}
+          {tab === 'roster' && <Roster />}
           {tab === 'audit' && <Audit />}
         </motion.div>
       </AnimatePresence>
@@ -473,5 +476,208 @@ function Audit() {
         </div>
       )}
     </section>
+  );
+}
+
+/* ---------------- Official student list ---------------- */
+// Minimal CSV parser (handles quotes and commas inside quotes)
+function parseCSV(text) {
+  const rows = [];
+  let row = [];
+  let cur = '';
+  let quoted = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i];
+    if (quoted) {
+      if (c === '"' && text[i + 1] === '"') { cur += '"'; i += 1; } else if (c === '"') quoted = false; else cur += c;
+    } else if (c === '"') quoted = true;
+    else if (c === ',') { row.push(cur); cur = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i += 1;
+      row.push(cur); rows.push(row); row = []; cur = '';
+    } else cur += c;
+  }
+  if (cur || row.length) { row.push(cur); rows.push(row); }
+  return rows.filter((r) => r.some((x) => x.trim()));
+}
+
+// Turns CSV rows into { regNo, email, name, faculty } using the header names
+function toStudents(rows) {
+  if (!rows.length) return [];
+  const head = rows[0].map((h) => h.toLowerCase().replace(/[^a-z]/g, ''));
+  const col = (...names) => head.findIndex((h) => names.includes(h));
+  const iReg = col('regno', 'registrationnumber', 'registrationno', 'regnumber', 'indexno');
+  const iEmail = col('email', 'universityemail', 'emailaddress');
+  const iName = col('name', 'fullname', 'studentname');
+  const iFac = col('faculty');
+  if (iReg < 0 || iEmail < 0 || iName < 0) throw new Error('The CSV needs the columns: regNo, email, name (faculty is optional).');
+  return rows.slice(1).map((r) => ({ regNo: r[iReg] || '', email: r[iEmail] || '', name: r[iName] || '', faculty: iFac >= 0 ? r[iFac] || '' : '' }));
+}
+
+const SAMPLE_CSV = 'regNo,name,email,faculty\nEG/2021/4519,Amal Silva,amal@student.lk,Engineering\nSC/2021/1033,Dilini Jayasinghe,dilini@student.lk,Science\n';
+
+function Roster() {
+  const { confirm } = useDialog();
+  const [data, setData] = useState(null);
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('');
+  const [preview, setPreview] = useState(null);
+  const [result, setResult] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [form, setForm] = useState({ regNo: '', name: '', email: '', faculty: '' });
+  const [domains, setDomains] = useState([]);
+
+  const load = () => api.get('/admin/roster', { params: { search: search || undefined, status: status || undefined } })
+    .then((r) => setData(r.data)).catch((e) => toast.error(errMsg(e)));
+  useEffect(() => { load(); }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { api.get('/config').then((r) => setDomains(r.data.allowedDomains || [])).catch(() => {}); }, []);
+
+  const onFile = async (file) => {
+    if (!file) return;
+    setResult(null);
+    try {
+      const students = toStudents(parseCSV(await file.text()));
+      if (!students.length) throw new Error('No students found in this file.');
+      setPreview({ name: file.name, students });
+    } catch (e) {
+      toast.error(e.message);
+    }
+  };
+
+  const doImport = async () => {
+    setImporting(true);
+    try {
+      const { data: r } = await api.post('/admin/roster/import', { rows: preview.students });
+      setResult(r);
+      setPreview(null);
+      toast.success(`${r.added} added, ${r.updated} updated`);
+      load();
+    } catch (e) {
+      toast.error(errMsg(e));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const addOne = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/admin/roster', form);
+      toast.success(`${form.name} added to the student list`);
+      setForm({ regNo: '', name: '', email: '', faculty: '' });
+      load();
+    } catch (err) {
+      toast.error(errMsg(err));
+    }
+  };
+
+  const remove = async (r) => {
+    const ok = await confirm({ title: `Remove ${r.name}?`, message: 'They will no longer be able to create an account.', confirmText: 'Remove', tone: 'danger' });
+    if (!ok) return;
+    try {
+      await api.delete(`/admin/roster/${r._id}`);
+      toast.success('Removed from the student list');
+      load();
+    } catch (err) {
+      toast.error(errMsg(err));
+    }
+  };
+
+  const downloadSample = () => {
+    const url = URL.createObjectURL(new Blob([SAMPLE_CSV], { type: 'text/csv' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'student-list-sample.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  return (
+    <>
+      <div className="policy-note" style={{ marginBottom: 18 }}>
+        <Info size={16} />
+        <span>
+          Only students on this list can create an account, using their own university email
+          {domains.length ? ` (${domains.map((d) => `@${d}`).join(' or ')})` : ''}. Import the list from the registrar's records each intake.
+        </span>
+      </div>
+
+      <div className="grid-2" style={{ alignItems: 'start', marginBottom: 20 }}>
+        <section className="card" style={{ margin: 0 }}>
+          <h2><Upload size={17} className="text-brand" style={{ verticalAlign: -3, marginRight: 6 }} />Import from CSV</h2>
+          <p className="muted small" style={{ margin: '4px 0 14px' }}>Columns: regNo, name, email, faculty. Existing students are updated, students who already have an account are skipped.</p>
+          <label className="dropzone">
+            <FileSpreadsheet size={20} />
+            <span>{preview ? preview.name : 'Choose a CSV file'}</span>
+            <small className="muted">{preview ? `${preview.students.length} students ready to import` : 'Exported from the registrar system or Excel'}</small>
+            <input type="file" accept=".csv,text/csv" hidden onChange={(e) => { onFile(e.target.files[0]); e.target.value = ''; }} />
+          </label>
+          <div className="row-gap" style={{ marginTop: 12 }}>
+            <button className="btn btn-primary btn-sm" disabled={!preview || importing} onClick={doImport}>
+              {importing ? 'Importing…' : `Import${preview ? ` ${preview.students.length} students` : ''}`}
+            </button>
+            <button className="btn btn-ghost btn-sm" type="button" onClick={downloadSample}><Download size={14} /> Sample CSV</button>
+          </div>
+          {result && (
+            <div className="small" style={{ marginTop: 12 }}>
+              <strong>{result.added}</strong> added · <strong>{result.updated}</strong> updated · <strong>{result.skipped}</strong> skipped (already registered)
+              {result.errors.length > 0 && (
+                <ul className="muted" style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+                  {result.errors.slice(0, 6).map((er) => <li key={`${er.row}-${er.regNo}`}>Row {er.row}{er.regNo ? ` (${er.regNo})` : ''}: {er.reason}</li>)}
+                  {result.errors.length > 6 && <li>…and {result.errors.length - 6} more</li>}
+                </ul>
+              )}
+            </div>
+          )}
+        </section>
+
+        <section className="card" style={{ margin: 0 }}>
+          <h2><Plus size={17} className="text-brand" style={{ verticalAlign: -3, marginRight: 6 }} />Add one student</h2>
+          <form className="grid-2" style={{ marginTop: 14 }} onSubmit={addOne}>
+            <label className="label">Registration no.<input className="input" required value={form.regNo} onChange={(e) => setForm({ ...form, regNo: e.target.value })} /></label>
+            <label className="label">Full name<input className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
+            <label className="label">University email<input className="input" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
+            <label className="label">Faculty<input className="input" value={form.faculty} onChange={(e) => setForm({ ...form, faculty: e.target.value })} /></label>
+            <div><button className="btn btn-primary btn-sm">Add to list</button></div>
+          </form>
+        </section>
+      </div>
+
+      <section className="card">
+        <form className="toolbar" onSubmit={(e) => { e.preventDefault(); load(); }}>
+          <div className="search-box">
+            <Search size={16} />
+            <input className="input" placeholder="Search reg no., name or email and press Enter" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          <select className="input" style={{ width: 'auto' }} value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="">Everyone</option>
+            <option value="pending">Not registered yet</option>
+            <option value="activated">Account created</option>
+          </select>
+          {data && <span className="muted small" style={{ marginLeft: 'auto' }}>{data.activated} of {data.total} students have created an account</span>}
+        </form>
+        {!data ? <Skeleton h={220} r={14} /> : data.rows.length === 0 ? <Empty icon={FileSpreadsheet} title="No students on the list yet">Import a CSV from the registrar to get started.</Empty> : (
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Reg. no.</th><th>Name</th><th>University email</th><th>Faculty</th><th>Status</th><th /></tr></thead>
+              <tbody>
+                {data.rows.map((r) => (
+                  <tr key={r._id}>
+                    <td><strong>{r.regNo}</strong></td>
+                    <td>{r.name}</td>
+                    <td className="small">{r.email}</td>
+                    <td className="small">{r.faculty || '—'}</td>
+                    <td><Badge status={r.status === 'activated' ? 'activated' : 'invited'} /></td>
+                    <td>{r.status !== 'activated' && <button className="btn btn-ghost btn-sm" onClick={() => remove(r)} aria-label="Remove from list"><Trash2 size={14} /></button>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </>
   );
 }

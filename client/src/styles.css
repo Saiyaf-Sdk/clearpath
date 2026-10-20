@@ -287,6 +287,23 @@ select.input option { color: #0f172a; background: #fff; }
 .select-float-label { position: absolute; left: 42px; top: 14px; transform: translateY(-50%); font-size: 0.7rem; font-weight: 600; color: var(--brand); pointer-events: none; }
 .select-float-chev { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
 
+/* Verification code boxes */
+.otp { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.otp input { width: 100%; aspect-ratio: 1 / 1.1; max-height: 58px; text-align: center; font: inherit; font-size: 1.35rem; font-weight: 700; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface); color: var(--text); transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s; }
+.otp input:focus { outline: none; border-color: var(--brand-solid); box-shadow: 0 0 0 4px var(--brand-soft); transform: translateY(-1px); }
+.otp input.filled { border-color: var(--brand-soft-2); }
+.resend { text-align: center; font-size: 0.86rem; color: var(--muted); }
+.resend button { background: none; border: 0; font: inherit; font-weight: 600; color: var(--brand); cursor: pointer; padding: 0; }
+.resend button:disabled { color: var(--muted); cursor: default; }
+/* "Is this you?" card after verification */
+.identity { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 14px; background: var(--good-soft); border: 1px solid rgba(5, 150, 105, 0.18); }
+.identity .avatar { width: 42px; height: 42px; background: var(--surface); color: var(--good); font-size: 0.9rem; }
+.identity strong { display: block; }
+.identity small { color: var(--text-2); font-size: 0.8rem; }
+.identity .verified { margin-left: auto; color: var(--good); display: flex; align-items: center; gap: 4px; font-size: 0.78rem; font-weight: 600; }
+.policy-note { display: flex; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--brand-soft); color: var(--brand-ink); font-size: 0.84rem; line-height: 1.5; }
+.policy-note svg { flex-shrink: 0; margin-top: 2px; }
+
 /* Custom checkbox */
 .check { display: inline-flex; align-items: center; gap: 10px; font-size: 0.88rem; color: var(--text-2); cursor: pointer; user-select: none; }
 .check input { position: absolute; opacity: 0; width: 1px; height: 1px; }
@@ -299,7 +316,8 @@ select.input option { color: #0f172a; background: #fff; }
 /* Register steps */
 .stepper { position: relative; display: flex; justify-content: space-between; margin: 2px 0 4px; }
 .step-item { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; font-size: 0.8rem; font-weight: 600; color: var(--muted); }
-.step-item:last-of-type { align-items: flex-end; }
+.stepper .step-item:nth-child(2) { align-items: center; }
+.stepper .step-item:nth-child(3) { align-items: flex-end; }
 .step-dot { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 0.78rem; border: 1.5px solid var(--line-strong); background: var(--surface); transition: 0.3s; }
 .step-item.active { color: var(--text); }
 .step-item.active .step-dot { border-color: var(--brand-solid); color: var(--brand); box-shadow: 0 0 0 4px var(--brand-soft); }
@@ -334,9 +352,9 @@ select.input option { color: #0f172a; background: #fff; }
 
 /* ================= Badges (status only) ================= */
 .badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-size: 0.73rem; font-weight: 700; white-space: nowrap; }
-.badge-pending, .badge-cancelled, .badge-waived, .badge-inactive { background: var(--neutral-soft); color: var(--muted); }
+.badge-pending, .badge-cancelled, .badge-waived, .badge-inactive, .badge-invited { background: var(--neutral-soft); color: var(--muted); }
 .badge-in-progress, .badge-receipt-submitted, .badge-role { background: var(--brand-soft); color: var(--brand-ink); }
-.badge-cleared, .badge-completed, .badge-paid, .badge-active { background: var(--good-soft); color: var(--good); }
+.badge-cleared, .badge-completed, .badge-paid, .badge-active, .badge-activated { background: var(--good-soft); color: var(--good); }
 .badge-dues { background: var(--warn-soft); color: var(--warn); }
 .badge-unpaid { background: var(--bad-soft); color: var(--bad); }
 

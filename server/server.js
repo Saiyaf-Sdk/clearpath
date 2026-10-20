@@ -5,6 +5,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const connectDB = require('./config/db');
+const { universityName, allowedDomains } = require('./utils/policy');
 const { notFound, errorHandler } = require('./middleware/error');
 
 const app = express();
@@ -31,6 +32,8 @@ app.use('/uploads', express.static(uploadDir));
 
 // Routes
 app.get('/api/health', (req, res) => res.json({ status: 'ok', app: 'ClearPath API' }));
+// Public info the frontend shows (university name, which email domains may register)
+app.get('/api/config', (req, res) => res.json({ universityName: universityName(), allowedDomains: allowedDomains() }));
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/clearances', require('./routes/clearanceRoutes'));
 app.use('/api/dues', require('./routes/dueRoutes'));

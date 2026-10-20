@@ -18,7 +18,8 @@ api.interceptors.response.use(
   (err) => {
     if (err.response?.status === 401 && (localStorage.getItem('cp_token') || sessionStorage.getItem('cp_token'))) {
       [localStorage, sessionStorage].forEach((s) => { s.removeItem('cp_token'); s.removeItem('cp_user'); });
-      if (!window.location.pathname.startsWith('/login')) window.location.href = '/login';
+      // Session expired: go back to the home page
+      window.location.href = '/';
     }
     return Promise.reject(err);
   }

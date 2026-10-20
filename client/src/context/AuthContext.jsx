@@ -25,13 +25,14 @@ export function AuthProvider({ children }) {
   };
 
   const login = async (email, password, remember = true) => save((await api.post('/auth/login', { email, password })).data, remember);
-  const register = async (form) => save((await api.post('/auth/register', form)).data);
+  // Last step of the verified student registration (see pages/Register.jsx)
+  const completeRegistration = async (payload) => save((await api.post('/auth/register/complete', payload)).data);
   const logout = () => {
     [localStorage, sessionStorage].forEach((s) => { s.removeItem('cp_token'); s.removeItem('cp_user'); });
     setUser(null);
   };
 
-  return <AuthContext.Provider value={{ user, login, register, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, login, completeRegistration, logout }}>{children}</AuthContext.Provider>;
 }
 
 export const useAuth = () => useContext(AuthContext);

@@ -10,5 +10,9 @@ router.delete('/users/:id', c.deleteUser);
 router.get('/requests', c.listRequests);
 router.get('/reports', c.reports);
 router.get('/audit', c.auditLogs);
+router.get('/roster', c.listRoster);
+router.post('/roster', c.addRosterEntry);
+router.post('/roster/import', c.importRoster);
+router.delete('/roster/:id', c.deleteRosterEntry);
 
 module.exports = router;

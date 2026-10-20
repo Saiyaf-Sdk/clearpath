@@ -1,5 +1,7 @@
 const crypto = require('crypto');
 const User = require('../models/User');
+const EnrolledStudent = require('../models/EnrolledStudent');
+const { emailAllowed, domainHint, devMode, maskEmail } = require('../utils/policy');
 const { asyncHandler, ApiError } = require('../middleware/error');
 const { signToken, audit } = require('../utils/helpers');
 const { sendMail } = require('../utils/mailer');
@@ -18,15 +20,101 @@ const publicUser = (u) => ({
   department: u.department,
 });
 
-// POST /api/auth/register  (students only - officers/admins are created by admin)
-exports.register = asyncHandler(async (req, res) => {
-  const { name, email, password, regNo, faculty, phone } = req.body;
-  if (!name || !email || !password || !regNo || !faculty) {
-    throw new ApiError(400, 'Name, email, password, registration number and faculty are required');
-  }
-  if (password.length < 6) throw new ApiError(400, 'Password must be at least 6 characters');
+/* ---------------- Student registration (verified) ----------------
+   1. /register/start    regNo + university email must match the official student list → emails a 6-digit code
+   2. /register/verify   checks the code, returns the student's official name/faculty to confirm identity
+   3. /register/complete code + password → creates the account (name/faculty come from the official list)
+------------------------------------------------------------------- */
+const findEnrolled = async (regNo, email, withOtp = false) => {
+  const q = EnrolledStudent.findOne({ regNo: String(regNo || '').toUpperCase().trim() });
+  if (withOtp) q.select('+otpHash');
+  const entry = await q;
+  if (!entry || entry.email !== String(email || '').toLowerCase().trim()) return null;
+  return entry;
+};
 
-  const user = await User.create({ name, email, password, regNo, faculty, phone, role: 'student' });
+const accountExists = (entry) => User.exists({ $or: [{ email: entry.email }, { regNo: entry.regNo }] });
+
+const checkCode = async (regNo, email, code) => {
+  const entry = await findEnrolled(regNo, email, true);
+  if (!entry || !entry.otpHash) throw new ApiError(400, 'Please request a new verification code.');
+  if (!entry.otpExpires || entry.otpExpires < new Date()) throw new ApiError(400, 'This code has expired. Please request a new one.');
+  if (entry.otpAttempts >= 5) throw new ApiError(429, 'Too many incorrect attempts. Please request a new code.');
+  if (sha256(String(code || '').trim()) !== entry.otpHash) {
+    entry.otpAttempts += 1;
+    await entry.save();
+    throw new ApiError(400, `That code is not correct. ${Math.max(0, 5 - entry.otpAttempts)} attempt(s) left.`);
+  }
+  return entry;
+};
+
+// POST /api/auth/register/start  body: { regNo, email }
+exports.registerStart = asyncHandler(async (req, res) => {
+  const { regNo, email } = req.body;
+  if (!regNo || !email) throw new ApiError(400, 'Registration number and university email are required');
+  if (!emailAllowed(email)) throw new ApiError(400, `Please use your university email (${domainHint()}).`);
+
+  const entry = await findEnrolled(regNo, email);
+  if (!entry) {
+    throw new ApiError(404, "We couldn't find this registration number with this email on the university's student list. Check both, or contact Student Affairs.");
+  }
+  if (entry.status === 'activated' || (await accountExists(entry))) {
+    throw new ApiError(409, 'An account already exists for this student. Please log in, or use Forgot password.');
+  }
+  if (entry.otpSentAt && Date.now() - entry.otpSentAt.getTime() < 30 * 1000) {
+    throw new ApiError(429, 'Please wait 30 seconds before requesting another code.');
+  }
+
+  const code = String(crypto.randomInt(100000, 1000000));
+  entry.otpHash = sha256(code);
+  entry.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+  entry.otpSentAt = new Date();
+  entry.otpAttempts = 0;
+  await entry.save();
+
+  await sendMail(
+    entry.email,
+    `ClearPath: your verification code is ${code}`,
+    `Hi ${entry.name},\n\nYour ClearPath verification code is ${code}. It expires in 10 minutes.\n\nIf you didn't try to create an account, you can ignore this email.`
+  );
+
+  const out = { message: `We sent a 6-digit code to ${maskEmail(entry.email)}.`, maskedEmail: maskEmail(entry.email) };
+  if (devMode()) out.devCode = code; // local demo without email only
+  res.json(out);
+});
+
+// POST /api/auth/register/verify  body: { regNo, email, code }
+exports.registerVerify = asyncHandler(async (req, res) => {
+  const { regNo, email, code } = req.body;
+  const entry = await checkCode(regNo, email, code);
+  res.json({ name: entry.name, faculty: entry.faculty, regNo: entry.regNo });
+});
+
+// POST /api/auth/register/complete  body: { regNo, email, code, password, phone }
+exports.registerComplete = asyncHandler(async (req, res) => {
+  const { regNo, email, code, password, phone } = req.body;
+  if (!password || password.length < 6) throw new ApiError(400, 'Password must be at least 6 characters');
+  const entry = await checkCode(regNo, email, code);
+  if (await accountExists(entry)) throw new ApiError(409, 'An account already exists for this student. Please log in.');
+
+  const user = await User.create({
+    name: entry.name,
+    email: entry.email,
+    password,
+    regNo: entry.regNo,
+    faculty: entry.faculty,
+    phone,
+    role: 'student',
+  });
+
+  entry.status = 'activated';
+  entry.activatedAt = new Date();
+  entry.user = user._id;
+  entry.otpHash = undefined;
+  entry.otpExpires = undefined;
+  await entry.save();
+  await audit(user, 'STUDENT_REGISTERED', user._id, entry.regNo);
+
   res.status(201).json({ token: signToken(user), user: publicUser(user) });
 });
 
@@ -84,7 +172,7 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
     await audit(user, 'PASSWORD_RESET_REQUESTED', user._id);
 
     // Without email set up (local demo), return the link so the flow can still be shown
-    if (process.env.NODE_ENV !== 'production' && !process.env.SMTP_HOST) response.devResetUrl = url;
+    if (devMode()) response.devResetUrl = url;
   }
   res.json(response);
 });

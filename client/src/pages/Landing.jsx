@@ -71,7 +71,8 @@ const SECURITY = [
 ];
 
 const FAQS = [
-  ['Who can use ClearPath?', 'Students create their own account. Department officers and administrators are added by the university administrator, so only authorised staff can clear students.'],
+  ['Who can use ClearPath?', 'ClearPath runs for one university. Only students on that university’s official student list can create an account, using their own university email and a one-time verification code. Department officers and administrators are added by the university administrator.'],
+  ['Can a student from another university sign up?', 'No. Registration checks the registration number against the university’s official list, only accepts the university’s email domain, and sends a code to that email to prove it belongs to the student.'],
   ['Do I still need to visit any offices?', 'Only if you choose to pay a due in person. Requesting clearance, tracking it, uploading receipts and downloading your certificate all happen online.'],
   ['What happens if a department finds a due?', 'Your tracker shows “Dues found” with the reason and amount. Pay it, upload the receipt, and the officer verifies it and clears you — only that department needs to act again.'],
   ['How long does clearance take?', 'It depends on how quickly each office reviews, but all departments work in parallel, so you are never waiting for one office to pass a paper form to the next.'],
