@@ -91,7 +91,16 @@ The Express server also serves the built React app, so the whole system is **one
 
 > The free Render plan sleeps after 15 minutes without visitors; the first visit then takes about a minute. Open the site a few minutes before your demonstration.
 
-**Before a real (non-demo) launch:** set `VITE_SHOW_DEMO=false` and `DEMO_MODE=false`, configure SMTP (e.g. a Gmail app password or Brevo) so registration codes and reset links are emailed, run `npm run seed` only once (or create universities and admins from the platform screen), and change every demo password.
+**Before a real (non-demo) launch:** set `VITE_SHOW_DEMO=false` and `DEMO_MODE=false`, set up email (Gmail relay, see below) so registration codes and reset links are emailed, run `npm run seed` only once (or create universities and admins from the platform screen), and change every demo password.
+
+### Email (registration codes, password reset, notifications)
+Without email settings, emails are printed in the server console and (locally / with `DEMO_MODE=true`) codes and reset links are shown on screen. To send real emails:
+
+- **Gmail relay – works locally and on Render (recommended).** A tiny Google Apps Script sends from your own Gmail over HTTPS: free (~100 emails/day), no domain, no approval. Open `server/scripts/gmail-relay.gs` and follow the 5 steps at the top (paste into script.google.com → set a secret → Deploy as Web app, access *Anyone*). Then set `MAIL_SCRIPT_URL=<web app URL>` and `MAIL_SCRIPT_SECRET=<same secret>`.
+- **Gmail SMTP – your computer only** (Render's free plan blocks SMTP ports). Turn on 2-Step Verification → https://myaccount.google.com/apppasswords → create an app password. Set `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_USER=you@gmail.com`, `SMTP_PASS=<16-character app password>`, `MAIL_FROM="ClearPath <you@gmail.com>"`.
+- **Brevo API** (`BREVO_API_KEY`) is also supported, but new Brevo accounts can't send until Brevo support approves them (they ask for a verified domain).
+
+Test it with `npm run test-email -- you@example.com` in `server`. Seeded `demo.` accounts are never emailed (so no mail goes to real university servers). To try registration with real email, add your own university email to the **Official student list** as admin, then register with it.
 
 ### Alternative: frontend on Vercel, API on Render
 Deploy `server` as a Render web service (root directory `server`, start `npm start`) with `CLIENT_URL=https://<app>.vercel.app`, and deploy `client` on Vercel (root directory `client`, preset Vite) with `VITE_API_URL=https://<api>.onrender.com`. `client/vercel.json` already handles page refreshes.
@@ -106,7 +115,10 @@ Deploy `server` as a Render web service (root directory `server`, start `npm sta
 | `CLIENT_URL` | | Web app address(es), comma separated. Leave empty when the API serves the app |
 | `APP_TIMEZONE` | | Time zone for charts, default `Asia/Colombo` |
 | `DEMO_MODE` | | `true` shows codes/reset links on screen when SMTP is not set (demo only) |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | | Email sending; empty = print emails to the server log |
+| `MAIL_SCRIPT_URL`, `MAIL_SCRIPT_SECRET` | | Gmail relay for email (works on Render, see `server/scripts/gmail-relay.gs`) |
+| `BREVO_API_KEY` | | Brevo API key (account must be approved by Brevo) |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` | | SMTP email instead of Brevo (e.g. Gmail app password, local only) |
+| `MAIL_FROM` | | Sender, e.g. `ClearPath <you@gmail.com>` (a verified sender with Brevo) |
 | `VITE_SHOW_DEMO` (build time) | | `true` shows the demo-accounts panel on the login page |
 
 ---

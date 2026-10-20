@@ -1,6 +1,7 @@
 // Finds which university an email belongs to, from its domain.
 // e.g. someone@ruh.ac.lk or someone@stu.ruh.ac.lk -> University of Ruhuna
 const University = require('../models/University');
+const { emailEnabled } = require('./mailer');
 
 const domainOf = (email) => String(email || '').toLowerCase().trim().split('@')[1] || '';
 
@@ -29,7 +30,7 @@ const publicUniversity = (u) =>
 
 // Show codes/links on screen only when no email is configured AND we are in local development
 // (or DEMO_MODE=true is set explicitly for a project demonstration)
-const devMode = () => !process.env.SMTP_HOST && (process.env.NODE_ENV !== 'production' || process.env.DEMO_MODE === 'true');
+const devMode = () => !emailEnabled() && (process.env.NODE_ENV !== 'production' || process.env.DEMO_MODE === 'true');
 
 const maskEmail = (email) => {
   const [user, domain] = String(email).split('@');
