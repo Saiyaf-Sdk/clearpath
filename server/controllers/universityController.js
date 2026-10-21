@@ -5,6 +5,11 @@ const { asyncHandler, ApiError } = require('../middleware/error');
 const { universityForEmail, universityForPortal, publicUniversity, emailBelongsTo, RESERVED } = require('../utils/policy');
 const { audit } = require('../utils/helpers');
 const { saveUpload, removeByUrl } = require('../utils/files');
+const { bundledFor, isBundled, LOGO_PREFIX } = require('../utils/logos');
+const { uniOf } = require('../middleware/auth');
+
+// Platform admin works on /platform/universities/:id; a university admin only on their own university
+const logoTarget = (req) => (req.user.role === 'superadmin' ? req.params.id : uniOf(req));
 
 /* ---------- Public ---------- */
 
@@ -89,10 +94,10 @@ exports.update = asyncHandler(async (req, res) => {
   res.json(uni);
 });
 
-// POST /api/platform/universities/:id/logo  (multipart field "logo", PNG/JPG)
+// POST /api/platform/universities/:id/logo and POST /api/admin/logo  (multipart field "logo")
 exports.uploadLogo = asyncHandler(async (req, res) => {
-  if (!req.file) throw new ApiError(400, 'Please choose a PNG or JPG logo');
-  const uni = await University.findById(req.params.id);
+  if (!req.file) throw new ApiError(400, 'Please choose a PNG, JPG, WebP or SVG logo');
+  const uni = await University.findById(logoTarget(req));
   if (!uni) throw new ApiError(404, 'University not found');
   const url = await saveUpload(req.file, { kind: 'logo', owner: req.user._id, university: uni._id });
   await removeByUrl(uni.logoUrl);
@@ -102,12 +107,15 @@ exports.uploadLogo = asyncHandler(async (req, res) => {
   res.json(uni);
 });
 
-// DELETE /api/platform/universities/:id/logo
+// DELETE /api/platform/universities/:id/logo and DELETE /api/admin/logo
+// Removes an uploaded logo; the official bundled logo (if the project has one) comes back.
 exports.removeLogo = asyncHandler(async (req, res) => {
-  const uni = await University.findById(req.params.id);
+  const uni = await University.findById(logoTarget(req));
   if (!uni) throw new ApiError(404, 'University not found');
+  if (!uni.logoUrl || isBundled(uni.logoUrl)) throw new ApiError(400, 'There is no uploaded logo to remove');
   await removeByUrl(uni.logoUrl);
-  uni.logoUrl = undefined;
+  const bundled = bundledFor(uni.slug);
+  uni.logoUrl = bundled ? `${LOGO_PREFIX}${bundled}` : undefined;
   await uni.save();
   await audit(req.user, 'UNIVERSITY_LOGO_REMOVED', uni._id, uni.name);
   res.json(uni);

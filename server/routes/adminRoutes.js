@@ -1,6 +1,8 @@
 const router = require('express').Router();
 const c = require('../controllers/adminController');
 const { protect, authorize } = require('../middleware/auth');
+const uni = require('../controllers/universityController');
+const { logoUpload } = require('../middleware/upload');
 
 router.use(protect, authorize('admin'));
 router.get('/users', c.listUsers);
@@ -17,5 +19,9 @@ router.post('/roster', c.addRosterEntry);
 router.post('/roster/import', c.importRoster);
 router.patch('/roster/:id', c.updateRosterEntry);
 router.delete('/roster/:id', c.deleteRosterEntry);
+
+// Their own university's logo
+router.post('/logo', logoUpload.single('logo'), uni.uploadLogo);
+router.delete('/logo', uni.removeLogo);
 
 module.exports = router;

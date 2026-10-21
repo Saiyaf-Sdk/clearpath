@@ -11,6 +11,8 @@ exports.serve = asyncHandler(async (req, res) => {
   res.setHeader('Content-Length', file.size);
   res.setHeader('Cache-Control', file.kind === 'logo' ? 'public, max-age=86400' : 'private, max-age=3600');
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  // An uploaded SVG opened directly must never run scripts
+  if (file.contentType === 'image/svg+xml') res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox");
   const safeName = (file.name || 'file').replace(/[^\w.\- ]/g, '_');
   res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
   res.end(file.data);

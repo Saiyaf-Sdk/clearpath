@@ -19,6 +19,7 @@ const AuditLog = require('./models/AuditLog');
 const Notification = require('./models/Notification');
 const StoredFile = require('./models/StoredFile');
 const UNIVERSITIES = require('./data/universities');
+const { applyBundledLogos } = require('./utils/logos');
 
 const PASSWORD = 'password123';
 const HOUR = 36e5;
@@ -348,6 +349,7 @@ async function buildUniversity({ code, domain, skipDepts = [], fixedStudents = [
 
   await University.insertMany(UNIVERSITIES);
   console.log(`Added ${UNIVERSITIES.length} universities.`);
+  console.log(`Applied bundled logos to ${await applyBundledLogos()} universities.`);
 
   // Platform admin (manages universities, logos and university admins)
   await User.create({ name: 'ClearPath Platform Admin', email: 'platform@clearpath.lk', password: PASSWORD, role: 'superadmin' });

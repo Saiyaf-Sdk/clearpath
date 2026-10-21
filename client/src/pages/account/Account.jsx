@@ -5,6 +5,7 @@ import { Eye, EyeOff, KeyRound, Lock, LogOut, Moon, Save, UserRound } from 'luci
 import api, { errMsg } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import LogoPanel from '../../components/LogoPanel';
 import { Field, PageHeader, PasswordStrength, Spin, UniLogo, initials } from '../../components/ui';
 
 const ROLE_LABEL = { student: 'Student', officer: 'Department officer', admin: 'University admin', superadmin: 'Platform admin' };
@@ -79,6 +80,15 @@ export default function Account() {
         </section>
 
         <div className="stack">
+          {user.role === 'admin' && user.university && (
+            <section className="card">
+              <h2>University logo</h2>
+              <p className="muted small" style={{ marginTop: 4 }}>Shown on your portal, in the sidebar, on certificates and on the verify page.</p>
+              <div style={{ marginTop: 12 }}>
+                <LogoPanel university={user.university} endpoint="/admin/logo" onChanged={(uni) => updateUser({ ...user, university: { ...user.university, logoUrl: uni.logoUrl } })} />
+              </div>
+            </section>
+          )}
           <section className="card">
             <h2><UserRound size={18} className="text-brand" style={{ verticalAlign: -3, marginRight: 6 }} />Profile</h2>
             <form className="form-stack" style={{ marginTop: 12 }} onSubmit={saveProfile}>

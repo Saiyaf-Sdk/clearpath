@@ -98,6 +98,15 @@ app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/stats', require('./routes/statsRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/files', require('./routes/fileRoutes'));
+// Official logos shipped with the project (server/data/logos)
+app.use('/api/logos', (req, res, next) => (/^\/[a-z0-9-]+\.(png|jpe?g|webp|svg)$/i.test(req.path) ? next() : res.status(404).json({ message: 'Logo not found' })), express.static(require('./utils/logos').LOGO_DIR, {
+  maxAge: '7d',
+  index: false,
+  setHeaders: (res, file) => {
+    // An SVG opened directly must never run scripts
+    if (file.endsWith('.svg')) res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox");
+  },
+}));
 app.use('/api/universities', require('./routes/universityRoutes'));
 app.use('/api/platform', require('./routes/platformRoutes'));
 

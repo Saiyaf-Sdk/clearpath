@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { Building2, Globe, GraduationCap, ImageUp, Plus, Search, Trash2, UserPlus, Users } from 'lucide-react';
+import { Building2, Globe, GraduationCap, Plus, Search, UserPlus, Users } from 'lucide-react';
 import api, { errMsg } from '../../api';
+import LogoPanel from '../../components/LogoPanel';
 import { useDialog } from '../../context/DialogContext';
 import { item, stagger } from '../../components/Page';
 import { Badge, Drawer, Empty, PageHeader, PageSkeleton, Spin, StatCard, UniLogo } from '../../components/ui';
@@ -134,7 +135,6 @@ export default function PlatformUniversities() {
 }
 
 function UniversityDrawer({ uni, onClose, onChanged }) {
-  const { confirm } = useDialog();
   const [edit, setEdit] = useState(emptyUni);
   const [admins, setAdmins] = useState([]);
   const [adminForm, setAdminForm] = useState({ name: '', email: '', password: '' });
@@ -158,34 +158,6 @@ function UniversityDrawer({ uni, onClose, onChanged }) {
       toast.error(errMsg(err));
     } finally {
       setBusy('');
-    }
-  };
-
-  const uploadLogo = async (file) => {
-    if (!file) return;
-    if (file.size > 1024 * 1024) return toast.error('Logo must be smaller than 1 MB');
-    const data = new FormData();
-    data.append('logo', file);
-    setBusy('logo');
-    try {
-      await api.post(`/platform/universities/${uni._id}/logo`, data);
-      toast.success('Logo updated');
-      onChanged();
-    } catch (err) {
-      toast.error(errMsg(err));
-    } finally {
-      setBusy('');
-    }
-  };
-
-  const removeLogo = async () => {
-    const ok = await confirm({ title: 'Remove this logo?', message: 'The initials badge will be shown instead.', confirmText: 'Remove', tone: 'danger' });
-    if (!ok) return;
-    try {
-      await api.delete(`/platform/universities/${uni._id}/logo`);
-      onChanged();
-    } catch (err) {
-      toast.error(errMsg(err));
     }
   };
 
@@ -236,17 +208,7 @@ function UniversityDrawer({ uni, onClose, onChanged }) {
           </div>
           <div>
             <div className="section-title">Logo</div>
-            <div className="row-gap" style={{ gap: 14 }}>
-              <UniLogo university={uni} size={72} />
-              <div className="row-gap">
-                <label className="btn btn-soft btn-sm" style={{ cursor: 'pointer' }}>
-                  {busy === 'logo' ? <Spin /> : <ImageUp size={15} />} Upload logo
-                  <input type="file" accept=".png,.jpg,.jpeg" hidden onChange={(e) => { uploadLogo(e.target.files[0]); e.target.value = ''; }} />
-                </label>
-                {uni.logoUrl && <button className="btn btn-ghost btn-sm" onClick={removeLogo}><Trash2 size={14} /> Remove</button>}
-              </div>
-            </div>
-            <p className="muted small" style={{ marginTop: 8 }}>Use the official logo file provided by the university (PNG or JPG, square works best, max 1 MB). It appears in the portal, on certificates and on the verify page.</p>
+            <LogoPanel university={uni} endpoint={`/platform/universities/${uni._id}/logo`} onChanged={onChanged} />
           </div>
 
           <form onSubmit={save}>

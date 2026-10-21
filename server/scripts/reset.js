@@ -20,6 +20,7 @@ const AuditLog = require('../models/AuditLog');
 const Notification = require('../models/Notification');
 const StoredFile = require('../models/StoredFile');
 const UNIVERSITIES = require('../data/universities');
+const { applyBundledLogos } = require('../utils/logos');
 
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(`--${name}`);
@@ -54,6 +55,7 @@ const value = (name) => {
   } else {
     await Promise.all(models.map((m) => m.syncIndexes()));
     await University.insertMany(UNIVERSITIES);
+    await applyBundledLogos();
     await User.create({ name: 'ClearPath Platform Admin', email, password, role: 'superadmin' });
     console.log(`\nFresh start ready: ${UNIVERSITIES.length} universities, no users except the platform admin.`);
     console.log('──────────────────────────────────────────────');

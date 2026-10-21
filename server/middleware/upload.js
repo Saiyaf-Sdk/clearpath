@@ -7,7 +7,7 @@ const { ApiError } = require('./error');
 const storage = multer.memoryStorage();
 
 const RECEIPT_TYPES = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.pdf': 'application/pdf' };
-const LOGO_TYPES = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png' };
+const LOGO_TYPES = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.svg': 'image/svg+xml' };
 
 const filter = (types, message) => (req, file, cb) => {
   const ext = path.extname(file.originalname).toLowerCase();
@@ -27,10 +27,11 @@ const upload = multer({
 
 module.exports = upload;
 
-// University logos (platform admin): PNG or JPG, max 1 MB – these formats also work in the PDF certificate
+// University logos (platform admin or the university's own admin): PNG, JPG, WebP or SVG, max 1 MB.
+// PNG and JPG also appear on the PDF certificate; WebP/SVG logos show everywhere except the PDF.
 module.exports.logoUpload = multer({
   storage,
   defParamCharset: 'utf8',
   limits: { fileSize: 1024 * 1024, files: 1 },
-  fileFilter: filter(LOGO_TYPES, 'Logo must be a PNG or JPG file'),
+  fileFilter: filter(LOGO_TYPES, 'Logo must be a PNG, JPG, WebP or SVG file'),
 });

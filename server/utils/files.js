@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const StoredFile = require('../models/StoredFile');
+const { readBundled, isBundled } = require('./logos');
 
 const PREFIX = '/api/files/';
 
@@ -35,6 +36,7 @@ const removeByUrl = async (url) => {
 // Reads a stored file's bytes by URL (used to put the university logo on the PDF certificate)
 const readByUrl = async (url) => {
   if (!url) return null;
+  if (isBundled(url)) return readBundled(url);
   if (url.startsWith(PREFIX)) {
     const f = await StoredFile.findOne({ key: url.slice(PREFIX.length) });
     return f ? { buffer: Buffer.from(f.data), contentType: f.contentType } : null;

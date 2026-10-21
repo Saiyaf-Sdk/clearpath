@@ -18,6 +18,8 @@ One platform serves **all 17 Sri Lankan state universities**: a user's universit
 | **Platform admin** | Overview of all universities · Universities (domains, logos, first admin) · Platform audit log |
 | **Everyone** | Landing page, choose-your-university page with a separate portal per university, verified registration (student list + university email + 6-digit code), login with "keep me signed in", forgot / reset password, certificate verification, help centre, notifications bell, account settings, dark mode |
 
+**University logos:** put each university's official logo in `server/data/logos/<portal>.png` (e.g. `ruhuna.png`, list in that folder's README). They appear on the portals, sidebar, certificates and verify page after a server restart, seed or reset. The platform admin (Universities) or each university admin (Account settings) can also upload a logo in the app (PNG, JPG, WebP or SVG, up to 1 MB).
+
 **Engineering:** JWT auth with role-based access · per-university data isolation · bcrypt passwords · Helmet security headers and CSP · CORS whitelist · brute-force rate limiting on sign-in routes · uploads stored in MongoDB (survive hosting restarts) · audit log of every action · in-app + email notifications · lazy-loaded pages · error boundaries (a crashing page never blanks the app) · every page has its own URL (refresh and back button work) · health check endpoint · graceful shutdown.
 
 ---
