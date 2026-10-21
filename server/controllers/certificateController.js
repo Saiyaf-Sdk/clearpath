@@ -43,7 +43,7 @@ exports.downloadPdf = asyncHandler(async (req, res) => {
       /* unsupported image – skip the logo */
     }
   }
-  doc.fillColor(navy).fontSize(22).font('Helvetica-Bold').text(uni?.name || 'ClearPath', 50, headY, { align: 'center', width: W - 100 });
+  doc.fillColor(navy).fontSize((uni?.name || '').length > 40 ? 18 : 22).font('Helvetica-Bold').text(uni?.name || 'ClearPath', 50, headY, { align: 'center', width: W - 100 });
   doc.fillColor('#475569').fontSize(10.5).font('Helvetica').text('Digital Clearance & No-Dues Certificate · issued through ClearPath', { align: 'center', width: W - 100 });
   doc.moveDown(2);
   doc.fillColor('#0f172a').fontSize(20).font('Helvetica-Bold').text('CLEARANCE CERTIFICATE', { align: 'center' });

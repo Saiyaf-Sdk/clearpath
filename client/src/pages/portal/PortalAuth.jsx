@@ -82,7 +82,7 @@ export default function PortalAuth({ mode = 'login' }) {
                 <strong>{uni.code} · {uni.domains[0]}</strong>
               </div>
             </div>
-            <h1 className="auth-headline">{uni.name}</h1>
+            <h1 className={`auth-headline ${uni.name.length > 34 ? 'long' : ''}`} lang="en">{uni.name}</h1>
             <p className="auth-lead">
               {mode === 'register'
                 ? `Create your ${uni.shortName} ClearPath account with your registration number and university email.`
@@ -346,7 +346,7 @@ function RegisterForm({ uni }) {
             <small className="field-hint">As printed on your student ID, e.g. EG/2021/1234</small>
           </div>
           <div>
-            <Field icon={Mail} label={`${uni.shortName} email`} type="email" required autoComplete="email" value={form.email} onChange={set('email')} />
+            <Field icon={Mail} label="University email" type="email" required autoComplete="email" value={form.email} onChange={set('email')} />
             {match === false ? (
               <small className="field-hint bad"><CircleAlert size={13} /> Must end with {uni.domains.map((d) => '@' + d).join(' or ')}</small>
             ) : (
