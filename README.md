@@ -141,18 +141,20 @@ Deploy `server` as a Render web service (root directory `server`, start `npm sta
 
 ---
 
-## 5. Demonstration script (about 10 minutes)
+## 5. Demonstration script (5 minutes)
 
-1. **Home page** – the problem (paper form, six offices) and the solution. Show the university email → portal idea.
-2. **Kasun (student)** – Overview shows 3 of 6 cleared and exactly what to do next. Open **Dues & payments** and upload any image/PDF as the receipt for the LKR 450 library fine.
-3. **Library officer** (`demo.lib@`) – the Overview chart, KPIs and badges. Open **Receipts to verify** → approve. Kasun automatically returns to the **Pending** list ("dues settled – waiting for final check") → **Clear**.
-4. Try to clear a student who still owes money → the server refuses (business rule enforced in the API).
-5. Clear Kasun in the remaining departments (log in as `demo.lab@` and `demo.saf@`, or as **admin → All requests → click the grey chips** to override).
-6. **Kasun** – the **Certificate** page: preview, download the PDF, copy the verification link. Open **/verify** (or scan the QR on your phone when deployed) → valid.
-7. **Tharindu** – submit a brand-new request and watch it appear in every officer's list and bell.
-8. **Admin** – Overview and **Reports** (faculty, reasons, dues by department, CSV export), **Audit log**, **Official student list** import, then **register Amal** from the Create account page with the on-screen code.
-9. **Colombo admin** – a different university sees completely different data. **Platform admin** – all universities, logos and domains.
-10. Security points: role-based routes (a student opening `/admin` is sent to their own dashboard), JWT expiry, rate limiting, per-university isolation.
+Run `npm run seed` first so the demo data is fresh. Password for every account: `password123`.
+
+| Time | Show | Rubric point |
+| --- | --- | --- |
+| 0:00–0:25 | Camera on: name, index number, the problem (paper form, six offices) and the MERN stack. | – |
+| 0:25–1:00 | Home → **Log in** → choose **University of Ruhuna** → log in as `demo.tharindu@ruh.ac.lk`. Submit a request (**Create**), then **Edit request** to change the note (**Update**). | Create, Update |
+| 1:00–2:00 | `demo.lib@ruh.ac.lk` → **Clearance requests**: search, filter, sort, open a request in the side panel (**Read**). **Dues register**: add a due with reg. no. `EG/2021/4510` (watch the live name check); try amount `0` → error; edit the amount; delete it. | Read, Create, Update, Delete, Validation |
+| 2:00–2:45 | `demo.kasun@ruh.ac.lk` → **Dues & payments** → upload any image as the receipt. Back as the librarian → **Receipts to verify** → approve → Kasun returns to Pending → **Clear**. | Workflow, business rules |
+| 2:45–3:40 | `demo.admin@ruh.ac.lk` → **Official student list**: add a student, edit it, delete it; sort by name. **Departments**: try deleting Library → refused. **Reports** and **Audit log** (every action you just did is listed). | Full CRUD, data integrity |
+| 3:40–4:15 | `demo.nimali@ruh.ac.lk` → **Certificate** → download PDF → open the verify link → valid. Log out, open the **Colombo** portal, try Kasun's account → refused (separate universities). | Security, multi-tenancy |
+| 4:15–4:40 | Browser device toolbar (phone width) and dark mode. | UI/UX, responsive |
+| 4:40–5:00 | GitHub repository: commit history, README with ERD and screenshots. | Code quality, documentation |
 
 ---
 
