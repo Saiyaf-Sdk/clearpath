@@ -352,6 +352,28 @@ exports.importRoster = asyncHandler(async (req, res) => {
   res.json(result);
 });
 
+// PATCH /api/admin/roster/:id  body: { regNo, email, name, faculty }
+// Students who already created an account: only name and faculty can change (their login stays the same).
+exports.updateRosterEntry = asyncHandler(async (req, res) => {
+  const entry = await EnrolledStudent.findOne({ _id: req.params.id, university: uniOf(req) });
+  if (!entry) throw new ApiError(404, 'Student not found on the list');
+  const next = cleanRow({ ...entry.toObject(), ...req.body });
+  const problem = rowProblem(next) || notOurEmail(req, next.email);
+  if (problem) throw new ApiError(400, problem);
+  if (entry.status === 'activated' && (next.regNo !== entry.regNo || next.email !== entry.email)) {
+    throw new ApiError(400, 'This student already has an account, so the registration number and email can no longer change. You can still edit the name and faculty.');
+  }
+  const before = `${entry.regNo} ${entry.name}`;
+  Object.assign(entry, next);
+  await entry.save();
+  // Keep the student's account in step with the official record
+  if (entry.status === 'activated' && entry.user) {
+    await User.updateOne({ _id: entry.user, university: uniOf(req) }, { name: entry.name, faculty: entry.faculty });
+  }
+  await audit(req.user, 'ROSTER_UPDATED', entry._id, `${before} → ${entry.regNo} ${entry.name}`);
+  res.json(entry);
+});
+
 // DELETE /api/admin/roster/:id  (only students who haven't created an account yet)
 exports.deleteRosterEntry = asyncHandler(async (req, res) => {
   const entry = await EnrolledStudent.findOne({ _id: req.params.id, university: uniOf(req) });

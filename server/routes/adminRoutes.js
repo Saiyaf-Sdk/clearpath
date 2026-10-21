@@ -15,6 +15,7 @@ router.get('/audit', c.auditLogs);
 router.get('/roster', c.listRoster);
 router.post('/roster', c.addRosterEntry);
 router.post('/roster/import', c.importRoster);
+router.patch('/roster/:id', c.updateRosterEntry);
 router.delete('/roster/:id', c.deleteRosterEntry);
 
 module.exports = router;

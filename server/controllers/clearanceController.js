@@ -80,6 +80,28 @@ exports.getMyRequests = asyncHandler(async (req, res) => {
   res.json(result);
 });
 
+// PATCH /api/clearances/:id  body: { reason, note }  (student – only before any department has decided)
+exports.updateRequest = asyncHandler(async (req, res) => {
+  const request = await ClearanceRequest.findOne({ _id: req.params.id, student: req.user._id });
+  if (!request) throw new ApiError(404, 'Request not found');
+  if (['completed', 'cancelled'].includes(request.status)) throw new ApiError(400, `A ${request.status} request cannot be edited`);
+  if (request.items.some((i) => i.actionedBy)) {
+    throw new ApiError(400, 'A department has already reviewed this request, so it can no longer be edited');
+  }
+  if (req.body.reason !== undefined) {
+    if (!REASONS.includes(req.body.reason)) throw new ApiError(400, 'Please choose a valid reason');
+    request.reason = req.body.reason;
+  }
+  if (req.body.note !== undefined) {
+    const note = String(req.body.note || '').trim();
+    if (note.length > 500) throw new ApiError(400, 'The note can be at most 500 characters');
+    request.note = note || undefined;
+  }
+  await request.save();
+  await audit(req.user, 'CLEARANCE_UPDATED', request._id, `${req.user.regNo || req.user.name} · ${request.reason}`);
+  res.json(await populateRequest(ClearanceRequest.findById(request._id)));
+});
+
 // PATCH /api/clearances/:id/cancel  (student, only if nothing cleared yet)
 exports.cancelRequest = asyncHandler(async (req, res) => {
   const request = await ClearanceRequest.findOne({ _id: req.params.id, student: req.user._id });

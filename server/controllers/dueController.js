@@ -193,6 +193,42 @@ exports.verifyDue = asyncHandler(async (req, res) => {
   res.json({ due, reopened });
 });
 
+// PATCH /api/dues/:id  body: { amount, description }  (officer – correct a due that isn't settled yet)
+exports.updateDue = asyncHandler(async (req, res) => {
+  const due = await Due.findOne({ _id: req.params.id, university: uniOf(req) }).populate('student', 'name email regNo').populate('department', 'name');
+  if (!due) throw new ApiError(404, 'Due not found');
+  if (req.user.role === 'officer' && String(due.department._id) !== String(req.user.department?._id)) {
+    throw new ApiError(403, 'This due belongs to another department');
+  }
+  if (!OPEN_DUE.includes(due.status)) throw new ApiError(400, 'Settled dues are kept for the record and cannot be edited');
+
+  const before = `${due.description} (LKR ${due.amount})`;
+  if (req.body.amount !== undefined) {
+    const amount = Number(req.body.amount);
+    if (!Number.isFinite(amount) || amount <= 0) throw new ApiError(400, 'Amount must be more than zero');
+    if (amount > 10000000) throw new ApiError(400, 'Amount looks too large');
+    due.amount = Math.round(amount * 100) / 100;
+  }
+  if (req.body.description !== undefined) {
+    const description = String(req.body.description).trim();
+    if (!description) throw new ApiError(400, 'Description is required');
+    if (description.length > 200) throw new ApiError(400, 'Description can be at most 200 characters');
+    due.description = description;
+  }
+  if (!due.isModified()) throw new ApiError(400, 'Nothing to change');
+  await due.save();
+
+  await audit(req.user, 'DUE_UPDATED', due._id, `${due.student.regNo}: ${before} → ${due.description} (LKR ${due.amount})`);
+  await notify(due.student, {
+    title: `${due.department.name} updated a due`,
+    body: `${due.description} – now LKR ${due.amount.toLocaleString('en-LK')}`,
+    link: '/student/dues',
+    kind: 'warning',
+    university: due.university,
+  });
+  res.json(due);
+});
+
 // DELETE /api/dues/:id  (officer - remove a due added by mistake)
 exports.deleteDue = asyncHandler(async (req, res) => {
   const due = await Due.findOne({ _id: req.params.id, university: uniOf(req) }).populate('student', 'regNo');
