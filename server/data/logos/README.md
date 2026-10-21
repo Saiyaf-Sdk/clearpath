@@ -22,7 +22,7 @@ Put each university's **official** logo here, named by its portal address (the `
 | `gwuim.png` | Gampaha Wickramarachchi University of Indigenous Medicine |
 | `vavuniya.png` | University of Vavuniya |
 
-- PNG is best (transparent background, square, about 512 × 512). JPG, WebP and SVG also work, but only PNG and JPG appear on the PDF certificate.
+- PNG is best (transparent background, square; these are 384 × 384, which stays sharp up to the largest size the app shows). JPG, WebP and SVG also work, but only PNG and JPG appear on the PDF certificate.
 - The server applies these on start, and `npm run seed` / `npm run reset` apply them too. Restart the server after adding or replacing a file.
 - A logo uploaded in the app (platform admin → Universities, or the university admin → Account settings) takes priority. Removing that upload brings this file back.
 - These logos belong to the universities. Use the files they publish and do not alter them.
