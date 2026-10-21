@@ -60,7 +60,7 @@ exports.getDepartmentDues = asyncHandler(async (req, res) => {
   const filter = { department: deptId, university: uniOf(req) };
   if (req.query.status) filter.status = req.query.status;
   const dues = await Due.find(filter)
-    .populate('student', 'name regNo email faculty')
+    .populate('student', 'name regNo email faculty avatarUrl')
     .populate('addedBy', 'name')
     .populate('verifiedBy', 'name')
     .sort('-updatedAt')
@@ -118,7 +118,7 @@ exports.addDue = asyncHandler(async (req, res) => {
   });
   await sendMail(student.email, 'ClearPath: New due added', `A due of LKR ${due.amount} was added by ${dept.name}: ${description}. Log in to ClearPath to pay and upload your receipt.`);
 
-  res.status(201).json(await due.populate('student', 'name regNo email faculty'));
+  res.status(201).json(await due.populate('student', 'name regNo email faculty avatarUrl'));
 });
 
 // POST /api/dues/:id/receipt  (student, multipart field "receipt")
@@ -151,7 +151,7 @@ exports.uploadReceipt = asyncHandler(async (req, res) => {
 
 // PATCH /api/dues/:id/verify  body: { approve: true|false, waive, note }  (officer)
 exports.verifyDue = asyncHandler(async (req, res) => {
-  const due = await Due.findOne({ _id: req.params.id, university: uniOf(req) }).populate('student', 'name email regNo').populate('department', 'name');
+  const due = await Due.findOne({ _id: req.params.id, university: uniOf(req) }).populate('student', 'name email regNo avatarUrl').populate('department', 'name');
   if (!due) throw new ApiError(404, 'Due not found');
   if (req.user.role === 'officer' && String(due.department._id) !== String(req.user.department?._id)) {
     throw new ApiError(403, 'This due belongs to another department');
@@ -195,7 +195,7 @@ exports.verifyDue = asyncHandler(async (req, res) => {
 
 // PATCH /api/dues/:id  body: { amount, description }  (officer – correct a due that isn't settled yet)
 exports.updateDue = asyncHandler(async (req, res) => {
-  const due = await Due.findOne({ _id: req.params.id, university: uniOf(req) }).populate('student', 'name email regNo').populate('department', 'name');
+  const due = await Due.findOne({ _id: req.params.id, university: uniOf(req) }).populate('student', 'name email regNo avatarUrl').populate('department', 'name');
   if (!due) throw new ApiError(404, 'Due not found');
   if (req.user.role === 'officer' && String(due.department._id) !== String(req.user.department?._id)) {
     throw new ApiError(403, 'This due belongs to another department');

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { homeFor, useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { UniLogo } from './ui';
+import { Avatar, UniLogo } from './ui';
 
 // Sections of the landing page shown in the top bar
 export const SECTIONS = [
@@ -94,7 +94,6 @@ export default function Navbar() {
     navigate('/');
   };
 
-  const initials = user?.name?.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();
   const roleLabel = user?.role === 'officer' ? user.department?.name || 'Officer' : user?.role === 'superadmin' ? 'Platform admin' : user?.role;
 
   const appLinks = [
@@ -169,7 +168,7 @@ export default function Navbar() {
               )}
               <div className="user-menu-wrap" ref={menuRef}>
                 <button className="user-chip" onClick={() => setMenu((m) => !m)} aria-expanded={menu} aria-haspopup="menu">
-                  <span className="avatar">{initials}</span>
+                  <Avatar name={user.name} src={user.avatarUrl} />
                   <span className="user-meta">
                     <strong>{user.name}</strong>
                     <small>{roleLabel}</small>

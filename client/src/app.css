@@ -431,3 +431,15 @@ span.uni-logo { flex: none; }
 }
 .shell-main { position: relative; z-index: 1; }
 @media print { .topo-bg { display: none; } }
+
+/* ---------- profile pictures ---------- */
+.avatar { overflow: hidden; flex: none; }
+.avatar.has-photo { background: var(--surface-2); }
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar-picker { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 14px; }
+.avatar-edit { position: relative; border: 0; padding: 0; background: none; border-radius: 50%; cursor: pointer; }
+.avatar-edit:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+.avatar-edit .avatar { font-size: 1.6rem; box-shadow: 0 0 0 4px var(--surface), 0 0 0 5px var(--line); }
+.avatar-edit-badge { position: absolute; right: -2px; bottom: -2px; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--brand); color: #fff; border: 3px solid var(--surface); transition: transform 0.15s; }
+.avatar-edit:hover .avatar-edit-badge { transform: scale(1.08); }
+.avatar-actions { display: flex; gap: 6px; }

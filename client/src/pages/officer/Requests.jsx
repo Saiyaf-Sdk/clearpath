@@ -214,7 +214,7 @@ export default function OfficerRequests() {
                         <input type="checkbox" aria-label={`Select ${r.student?.name}`} disabled={!clearable(r)} checked={selected.includes(r._id)}
                           onChange={(e) => setSelected((list) => (e.target.checked ? [...list, r._id] : list.filter((x) => x !== r._id)))} />
                       </td>
-                      <td><Person name={r.student?.name} sub={`${r.student?.regNo} · ${r.student?.faculty}`} /></td>
+                      <td><Person name={r.student?.name} photo={r.student?.avatarUrl} sub={`${r.student?.regNo} · ${r.student?.faculty}`} /></td>
                       <td className="hide-sm">{cap(r.reason)}</td>
                       <td className="hide-sm"><span title={fmtDateTime(r.createdAt)}>{fmtDate(r.createdAt)}</span><div className="muted small">{daysSince(r.createdAt) === 0 ? 'today' : `${daysSince(r.createdAt)} d ago`}</div></td>
                       <td className="hide-md">{open.length ? <span className="warn-text">{lkr(open.reduce((s, d) => s + d.amount, 0))}</span> : <span className="muted">None</span>}</td>

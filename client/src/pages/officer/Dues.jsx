@@ -197,7 +197,7 @@ export default function OfficerDues() {
               <tbody>
                 {shown.map((d) => (
                   <tr key={d._id}>
-                    <td><Person name={d.student?.name} sub={d.student?.regNo} /></td>
+                    <td><Person name={d.student?.name} photo={d.student?.avatarUrl} sub={d.student?.regNo} /></td>
                     <td>{d.description}{d.addedBy?.name && <div className="muted small">by {d.addedBy.name}</div>}</td>
                     <td><strong>{lkr(d.amount)}</strong></td>
                     <td><Badge status={d.status} />{d.paidAt && <div className="muted small">{fmtDate(d.paidAt)}</div>}</td>

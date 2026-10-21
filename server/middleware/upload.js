@@ -35,3 +35,12 @@ module.exports.logoUpload = multer({
   limits: { fileSize: 1024 * 1024, files: 1 },
   fileFilter: filter(LOGO_TYPES, 'Logo must be a PNG, JPG, WebP or SVG file'),
 });
+
+// Profile pictures (any signed-in user): PNG, JPG or WebP, max 2 MB. The app crops and shrinks them first.
+const AVATAR_TYPES = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' };
+module.exports.avatarUpload = multer({
+  storage,
+  defParamCharset: 'utf8',
+  limits: { fileSize: 2 * 1024 * 1024, files: 1 },
+  fileFilter: filter(AVATAR_TYPES, 'Profile picture must be a PNG, JPG or WebP image'),
+});

@@ -115,7 +115,7 @@ export default function AdminOverview() {
             <div className="attn-list">
               {data.recent.map((r) => (
                 <Link key={r._id} to={`/admin/requests?open=${r._id}`} className="attn-row">
-                  <Person name={r.student?.name} sub={`${r.student?.regNo} · ${fmtDate(r.createdAt)}`} />
+                  <Person name={r.student?.name} photo={r.student?.avatarUrl} sub={`${r.student?.regNo} · ${fmtDate(r.createdAt)}`} />
                   <Badge status={r.status} />
                 </Link>
               ))}

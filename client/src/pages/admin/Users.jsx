@@ -126,7 +126,7 @@ export default function AdminUsers() {
               <tbody>
                 {sorted.map((u) => (
                   <tr key={u._id} onClick={() => setEdit({ ...u, newPassword: '' })}>
-                    <td><Person name={u.name} sub={u.email} /></td>
+                    <td><Person name={u.name} photo={u.avatarUrl} sub={u.email} /></td>
                     <td><span className={`badge badge-role role-${u.role}`}>{ROLE_LABEL[u.role] || cap(u.role)}</span></td>
                     <td className="small hide-sm">{u.role === 'officer' ? u.department?.name : u.role === 'student' ? `${u.regNo} · ${u.faculty}` : 'Full access'}</td>
                     <td><Badge status={u.isActive ? 'active' : 'inactive'} /></td>

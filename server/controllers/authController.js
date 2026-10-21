@@ -3,6 +3,7 @@ const User = require('../models/User');
 const EnrolledStudent = require('../models/EnrolledStudent');
 const { universityForEmail, universityForPortal, publicUniversity, devMode, maskEmail } = require('../utils/policy');
 const { asyncHandler, ApiError } = require('../middleware/error');
+const { saveUpload, removeByUrl } = require('../utils/files');
 const { signToken, audit, appUrl } = require('../utils/helpers');
 const { sendMail } = require('../utils/mailer');
 
@@ -16,6 +17,7 @@ const publicUser = (u) => ({
   regNo: u.regNo,
   faculty: u.faculty,
   phone: u.phone,
+  avatarUrl: u.avatarUrl,
   department: u.department,
   // The university portal this account belongs to (logo + name shown in the app)
   university: u.university && u.university.name ? publicUniversity(u.university) : undefined,
@@ -201,6 +203,29 @@ exports.updateProfile = asyncHandler(async (req, res) => {
     if (name.length < 2) throw new ApiError(400, 'Please enter your name');
     user.name = name;
   }
+  await user.save();
+  const full = await User.findById(user._id).populate('department', 'name code').populate('university');
+  res.json({ user: publicUser(full) });
+});
+
+// POST /api/auth/me/avatar  (multipart field "avatar": PNG, JPG or WebP)  – anyone can set a profile picture
+exports.uploadAvatar = asyncHandler(async (req, res) => {
+  if (!req.file) throw new ApiError(400, 'Please choose a PNG, JPG or WebP picture');
+  const user = await User.findById(req.user._id);
+  const url = await saveUpload(req.file, { kind: 'avatar', owner: user._id, university: user.university });
+  await removeByUrl(user.avatarUrl);
+  user.avatarUrl = url;
+  await user.save();
+  const full = await User.findById(user._id).populate('department', 'name code').populate('university');
+  res.json({ user: publicUser(full) });
+});
+
+// DELETE /api/auth/me/avatar
+exports.removeAvatar = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  if (!user.avatarUrl) throw new ApiError(400, 'You have no profile picture to remove');
+  await removeByUrl(user.avatarUrl);
+  user.avatarUrl = undefined;
   await user.save();
   const full = await User.findById(user._id).populate('department', 'name code').populate('university');
   res.json({ user: publicUser(full) });

@@ -6,7 +6,7 @@ import { ChevronDown, House, LifeBuoy, LogOut, Menu, Moon, Settings, ShieldCheck
 import { homeFor, useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import ErrorBoundary from '../ErrorBoundary';
-import { PageSkeleton, UniLogo, initials } from '../ui';
+import { Avatar, PageSkeleton, UniLogo } from '../ui';
 import { NAV, titleFor } from './nav';
 import { ShellProvider, useShell } from './ShellContext';
 import NotificationBell from './NotificationBell';
@@ -158,7 +158,7 @@ function UserMenu() {
   return (
     <div className="user-menu-wrap" ref={ref}>
       <button className="user-chip" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="menu">
-        <span className="avatar">{initials(user.name)}</span>
+        <Avatar name={user.name} src={user.avatarUrl} />
         <span className="user-meta">
           <strong>{user.name}</strong>
           <small>{user.role === 'officer' ? user.department?.name : ROLE_LABEL[user.role]}</small>

@@ -31,6 +31,7 @@ const errorHandler = (err, req, res, next) => {
     message = `${Object.keys(err.keyValue).join(', ')} already exists`;
   } else if (err.name === 'MulterError') {
     status = 400;
+    if (err.code === 'LIMIT_FILE_SIZE') message = 'That file is too large. Please choose a smaller one.';
   }
 
   if (status === 500) console.error(err);

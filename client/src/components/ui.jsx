@@ -353,14 +353,22 @@ export function PageHeader({ title, subtitle, eyebrow, icon: Icon, actions, chil
 }
 
 /* ---------- small building blocks ---------- */
-export function Avatar({ name, size }) {
-  return <span className="avatar" style={size ? { width: size, height: size, fontSize: size * 0.36 } : undefined}>{initials(name)}</span>;
+// Profile picture, or the person's initials until they upload one
+export function Avatar({ name, src, size, className = '' }) {
+  const [broken, setBroken] = useState(false);
+  useEffect(() => setBroken(false), [src]);
+  const url = src && !broken ? (/^https?:/.test(src) ? src : `${API_URL}${src}`) : null;
+  return (
+    <span className={`avatar ${url ? 'has-photo' : ''} ${className}`} style={size ? { width: size, height: size, fontSize: size * 0.36 } : undefined}>
+      {url ? <img src={url} alt="" loading="lazy" onError={() => setBroken(true)} /> : initials(name)}
+    </span>
+  );
 }
 
-export function Person({ name, sub }) {
+export function Person({ name, sub, photo }) {
   return (
     <div className="person">
-      <Avatar name={name} />
+      <Avatar name={name} src={photo} />
       <div><strong>{name || '—'}</strong>{sub && <small>{sub}</small>}</div>
     </div>
   );

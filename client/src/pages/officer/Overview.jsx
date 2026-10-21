@@ -99,7 +99,7 @@ export default function OfficerOverview() {
             <div className="attn-list">
               {data.attention.map((r) => (
                 <Link key={r._id} to={`/officer/requests?open=${r._id}`} className="attn-row">
-                  <Person name={r.student?.name} sub={`${r.student?.regNo} · ${cap(r.reason)}`} />
+                  <Person name={r.student?.name} photo={r.student?.avatarUrl} sub={`${r.student?.regNo} · ${cap(r.reason)}`} />
                   <span className={`wait-chip ${r.waitingDays >= 5 ? 'late' : ''}`}>{r.waitingDays === 0 ? 'Today' : `${r.waitingDays} day${r.waitingDays > 1 ? 's' : ''}`}</span>
                 </Link>
               ))}

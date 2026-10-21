@@ -55,7 +55,7 @@ export default function OfficerReceipts() {
           {waiting.map((d) => (
             <motion.article key={d._id} className="card receipt-card" variants={item}>
               <div className="rc-head">
-                <Person name={d.student?.name} sub={d.student?.regNo} />
+                <Person name={d.student?.name} photo={d.student?.avatarUrl} sub={d.student?.regNo} />
                 <span className="due-amount">{lkr(d.amount)}</span>
               </div>
               <p className="rc-desc">{d.description}</p>
@@ -88,7 +88,7 @@ export default function OfficerReceipts() {
               <tbody>
                 {recent.map((d) => (
                   <tr key={d._id}>
-                    <td><Person name={d.student?.name} sub={d.student?.regNo} /></td>
+                    <td><Person name={d.student?.name} photo={d.student?.avatarUrl} sub={d.student?.regNo} /></td>
                     <td className="small">{d.description}</td>
                     <td><strong>{lkr(d.amount)}</strong></td>
                     <td><Badge status={d.status} /></td>

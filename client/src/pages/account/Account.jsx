@@ -5,8 +5,9 @@ import { Eye, EyeOff, KeyRound, Lock, LogOut, Moon, Save, UserRound } from 'luci
 import api, { errMsg } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import AvatarPicker from '../../components/AvatarPicker';
 import LogoPanel from '../../components/LogoPanel';
-import { Field, PageHeader, PasswordStrength, Spin, UniLogo, initials } from '../../components/ui';
+import { Field, PageHeader, PasswordStrength, Spin, UniLogo } from '../../components/ui';
 
 const ROLE_LABEL = { student: 'Student', officer: 'Department officer', admin: 'University admin', superadmin: 'Platform admin' };
 
@@ -63,7 +64,7 @@ export default function Account() {
 
       <div className="account-grid">
         <section className="card profile-card">
-          <span className="avatar avatar-lg">{initials(user.name)}</span>
+          <AvatarPicker />
           <h2>{user.name}</h2>
           <p className="muted small">{user.email}</p>
           <span className="badge badge-role" style={{ marginTop: 10 }}>{ROLE_LABEL[user.role]}</span>

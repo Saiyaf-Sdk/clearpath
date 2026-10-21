@@ -8,6 +8,7 @@ const AuditLog = require('../models/AuditLog');
 const EnrolledStudent = require('../models/EnrolledStudent');
 const { emailBelongsTo } = require('../utils/policy');
 const { asyncHandler, ApiError } = require('../middleware/error');
+const { removeByUrl } = require('../utils/files');
 const { uniOf } = require('../middleware/auth');
 const { audit, escapeRx } = require('../utils/helpers');
 
@@ -133,6 +134,7 @@ exports.deleteUser = asyncHandler(async (req, res) => {
   if ((await ClearanceRequest.exists({ student: user._id })) || (await Due.exists({ student: user._id }))) {
     throw new ApiError(400, 'This account has clearance records. Disable it instead, so the history is kept.');
   }
+  await removeByUrl(user.avatarUrl);
   await user.deleteOne();
   // Let the student register again later if they are still on the official list
   if (user.role === 'student') await EnrolledStudent.updateOne({ university: uniOf(req), regNo: user.regNo }, { status: 'pending', $unset: { user: 1, activatedAt: 1 } });
@@ -156,7 +158,7 @@ exports.listRequests = asyncHandler(async (req, res) => {
     filter.student = { $in: students.map((u) => u._id) };
   }
   const requests = await ClearanceRequest.find(filter)
-    .populate('student', 'name regNo email faculty')
+    .populate('student', 'name regNo email faculty avatarUrl')
     .populate('items.department', 'name code order')
     .sort('-createdAt')
     .limit(500)
@@ -168,7 +170,7 @@ exports.listRequests = asyncHandler(async (req, res) => {
 // GET /api/admin/requests/:id  – full detail: items, dues, certificate and history
 exports.getRequest = asyncHandler(async (req, res) => {
   const request = await ClearanceRequest.findOne({ _id: req.params.id, university: uniOf(req) })
-    .populate('student', 'name regNo email faculty phone')
+    .populate('student', 'name regNo email faculty phone avatarUrl')
     .populate('items.department', 'name code order')
     .populate('items.actionedBy', 'name')
     .lean();
@@ -177,7 +179,7 @@ exports.getRequest = asyncHandler(async (req, res) => {
   const [dues, certificate, history] = await Promise.all([
     Due.find({ student: request.student._id }).populate('department', 'name code').sort('-createdAt').lean(),
     Certificate.findOne({ request: request._id }).lean(),
-    AuditLog.find({ university: uniOf(req), target: String(request._id) }).populate('actor', 'name role').sort('createdAt').lean(),
+    AuditLog.find({ university: uniOf(req), target: String(request._id) }).populate('actor', 'name role avatarUrl').sort('createdAt').lean(),
   ]);
   res.json({ ...request, dues, certificate, history });
 });
@@ -233,7 +235,7 @@ exports.reports = asyncHandler(async (req, res) => {
       { $sort: { total: -1 } },
     ]),
     Due.aggregate([{ $match: { university: uni } }, { $group: { _id: { d: '$department', st: '$status' }, total: { $sum: '$amount' } } }]),
-    ClearanceRequest.find({ university: uni }).sort('-createdAt').limit(6).populate('student', 'name regNo faculty').lean(),
+    ClearanceRequest.find({ university: uni }).sort('-createdAt').limit(6).populate('student', 'name regNo faculty avatarUrl').lean(),
   ]);
   const sub = Object.fromEntries(submittedSeries.map((x) => [x._id, x.n]));
   const comp = Object.fromEntries(completedSeries.map((x) => [x._id, x.n]));
@@ -273,7 +275,7 @@ exports.auditLogs = asyncHandler(async (req, res) => {
   if (req.query.action) filter.action = new RegExp(`^${String(req.query.action).replace(/[^A-Z_]/g, '')}`);
   if (req.query.search) filter.details = new RegExp(escapeRx(req.query.search), 'i');
   const [items, total] = await Promise.all([
-    AuditLog.find(filter).populate('actor', 'name role').populate('department', 'name').sort('-createdAt').skip((page - 1) * size).limit(size).lean(),
+    AuditLog.find(filter).populate('actor', 'name role avatarUrl').populate('department', 'name').sort('-createdAt').skip((page - 1) * size).limit(size).lean(),
     AuditLog.countDocuments(filter),
   ]);
   res.json({ items, total, page, pages: Math.max(1, Math.ceil(total / size)) });

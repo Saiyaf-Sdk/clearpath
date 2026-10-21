@@ -124,7 +124,7 @@ export default function AdminRequests() {
               <tbody>
                 {sorted.map((r) => (
                   <tr key={r._id} onClick={() => setParam('open', r._id)} className={openId === r._id ? 'row-active' : ''}>
-                    <td><Person name={r.student?.name} sub={`${r.student?.regNo} · ${r.student?.faculty}`} /></td>
+                    <td><Person name={r.student?.name} photo={r.student?.avatarUrl} sub={`${r.student?.regNo} · ${r.student?.faculty}`} /></td>
                     <td className="hide-sm">{cap(r.reason)}</td>
                     <td className="hide-sm">{fmtDate(r.createdAt)}</td>
                     <td onClick={(e) => e.stopPropagation()}>

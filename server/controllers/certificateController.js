@@ -9,7 +9,7 @@ const { readByUrl } = require('../utils/files');
 
 // GET /api/certificates/:requestId/pdf  (student who owns it, or admin)
 exports.downloadPdf = asyncHandler(async (req, res) => {
-  const cert = await Certificate.findOne({ request: req.params.requestId }).populate('student', 'name regNo faculty email').populate('university');
+  const cert = await Certificate.findOne({ request: req.params.requestId }).populate('student', 'name regNo faculty email avatarUrl').populate('university');
   if (!cert) throw new ApiError(404, 'Certificate not issued yet');
   if (req.user.role === 'student' && String(cert.student._id) !== String(req.user._id)) {
     throw new ApiError(403, 'Not your certificate');
@@ -90,7 +90,7 @@ exports.downloadPdf = asyncHandler(async (req, res) => {
 
 // GET /api/verify/:certificateNo  (public)
 exports.verify = asyncHandler(async (req, res) => {
-  const cert = await Certificate.findOne({ certificateNo: req.params.certificateNo.toUpperCase() }).populate('student', 'name regNo faculty').populate('university');
+  const cert = await Certificate.findOne({ certificateNo: req.params.certificateNo.toUpperCase() }).populate('student', 'name regNo faculty avatarUrl').populate('university');
   if (!cert) return res.status(404).json({ valid: false, message: 'No certificate found with this number' });
   const request = await ClearanceRequest.findById(cert.request).select('reason completedAt');
   res.json({

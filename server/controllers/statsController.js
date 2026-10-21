@@ -67,9 +67,9 @@ exports.officerOverview = asyncHandler(async (req, res) => {
     ClearanceRequest.find({ university: uni, status: { $in: ['pending', 'in-progress'] }, items: { $elemMatch: { department: d, status: 'pending' } } })
       .sort('createdAt')
       .limit(6)
-      .populate('student', 'name regNo faculty')
+      .populate('student', 'name regNo faculty avatarUrl')
       .lean(),
-    AuditLog.find({ department: d }).sort('-createdAt').limit(8).populate('actor', 'name role').lean(),
+    AuditLog.find({ department: d }).sort('-createdAt').limit(8).populate('actor', 'name role avatarUrl').lean(),
   ]);
 
   const count = (active, st) => itemAgg.filter((r) => (active === null || r._id.active === active) && r._id.st === st).reduce((s, r) => s + r.n, 0);
@@ -119,7 +119,7 @@ exports.officerActivity = asyncHandler(async (req, res) => {
   const filter = { department: dept._id };
   if (req.query.action) filter.action = new RegExp(`^${String(req.query.action).replace(/[^A-Z_]/g, '')}`);
   const [items, total] = await Promise.all([
-    AuditLog.find(filter).sort('-createdAt').skip((page - 1) * size).limit(size).populate('actor', 'name role').lean(),
+    AuditLog.find(filter).sort('-createdAt').skip((page - 1) * size).limit(size).populate('actor', 'name role avatarUrl').lean(),
     AuditLog.countDocuments(filter),
   ]);
   res.json({ items, total, page, pages: Math.max(1, Math.ceil(total / size)) });
@@ -136,7 +136,7 @@ exports.platformOverview = asyncHandler(async (req, res) => {
     ClearanceRequest.aggregate([{ $group: { _id: { u: '$university', st: '$status' }, n: { $sum: 1 } } }]),
     Certificate.aggregate([{ $group: { _id: '$university', n: { $sum: 1 } } }]),
     ClearanceRequest.aggregate([{ $match: { createdAt: { $gte: since30 } } }, { $group: { _id: dayExpr('$createdAt'), n: { $sum: 1 } } }]),
-    AuditLog.find().sort('-createdAt').limit(10).populate('actor', 'name role').populate('university', 'name code').lean(),
+    AuditLog.find().sort('-createdAt').limit(10).populate('actor', 'name role avatarUrl').populate('university', 'name code').lean(),
   ]);
 
   const roles = (u, role) => roleAgg.filter((r) => (u === null || String(r._id.u) === String(u)) && r._id.role === role).reduce((s, r) => s + r.n, 0);
@@ -183,7 +183,7 @@ exports.platformAudit = asyncHandler(async (req, res) => {
   const filter = {};
   if (req.query.university) filter.university = req.query.university;
   const [items, total] = await Promise.all([
-    AuditLog.find(filter).sort('-createdAt').skip((page - 1) * size).limit(size).populate('actor', 'name role email').populate('university', 'name code').lean(),
+    AuditLog.find(filter).sort('-createdAt').skip((page - 1) * size).limit(size).populate('actor', 'name role email avatarUrl').populate('university', 'name code').lean(),
     AuditLog.countDocuments(filter),
   ]);
   res.json({ items, total, page, pages: Math.max(1, Math.ceil(total / size)) });

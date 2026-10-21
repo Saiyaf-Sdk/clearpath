@@ -11,7 +11,7 @@ const OPEN_DUE = ['unpaid', 'receipt-submitted'];
 const REASONS = ['graduation', 'transfer', 'withdrawal', 'other'];
 
 const populateRequest = (q) =>
-  q.populate('student', 'name email regNo faculty').populate('items.department', 'name code order').populate('items.actionedBy', 'name');
+  q.populate('student', 'name email regNo faculty avatarUrl').populate('items.department', 'name code order').populate('items.actionedBy', 'name');
 
 const progressOf = (items = []) => ({
   total: items.length,
@@ -131,7 +131,7 @@ exports.getDepartmentRequests = asyncHandler(async (req, res) => {
     status: { $ne: 'cancelled' },
     items: { $elemMatch: itemFilter },
   })
-    .populate('student', 'name email regNo faculty phone')
+    .populate('student', 'name email regNo faculty phone avatarUrl')
     .populate('items.department', 'name code order')
     .sort('-createdAt')
     .limit(500)
@@ -174,7 +174,7 @@ exports.actionItem = asyncHandler(async (req, res) => {
     throw new ApiError(403, 'You can only act on your own department');
   }
 
-  const request = await ClearanceRequest.findOne({ _id: id, university: uniOf(req) }).populate('student', 'name email regNo');
+  const request = await ClearanceRequest.findOne({ _id: id, university: uniOf(req) }).populate('student', 'name email regNo avatarUrl');
   if (!request) throw new ApiError(404, 'Request not found');
   if (request.status === 'cancelled') throw new ApiError(400, 'This request was cancelled');
   if (request.status === 'completed') throw new ApiError(400, 'This request is already completed and its certificate issued');

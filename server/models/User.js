@@ -23,6 +23,9 @@ const userSchema = new mongoose.Schema(
     faculty: { type: String, trim: true },
     phone: { type: String, trim: true },
 
+    // Profile picture (stored in MongoDB, see utils/files.js)
+    avatarUrl: { type: String },
+
     // Officer-only field: which department they work for
     department: { type: mongoose.Schema.Types.ObjectId, ref: 'Department' },
 

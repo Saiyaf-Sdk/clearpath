@@ -6,7 +6,7 @@ const mongoose = require('mongoose');
 const storedFileSchema = new mongoose.Schema(
   {
     key: { type: String, required: true, unique: true },
-    kind: { type: String, enum: ['receipt', 'logo', 'other'], default: 'other' },
+    kind: { type: String, enum: ['receipt', 'logo', 'avatar', 'other'], default: 'other' },
     name: { type: String, trim: true },
     contentType: { type: String, required: true },
     size: { type: Number, required: true },
