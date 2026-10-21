@@ -10,6 +10,7 @@ import { PageSkeleton, UniLogo, initials } from '../ui';
 import { NAV, titleFor } from './nav';
 import { ShellProvider, useShell } from './ShellContext';
 import NotificationBell from './NotificationBell';
+import TopoBackground from './TopoBackground';
 
 const ROLE_LABEL = { student: 'Student', officer: 'Department officer', admin: 'University admin', superadmin: 'Platform admin' };
 
@@ -39,6 +40,7 @@ function Shell() {
 
   return (
     <div className="shell">
+      <TopoBackground />
       <Sidebar open={open} onClose={() => setOpen(false)} />
       <div className={`shell-scrim ${open ? 'show' : ''}`} onClick={() => setOpen(false)} aria-hidden="true" />
       <div className="shell-main">

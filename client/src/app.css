@@ -421,3 +421,13 @@ a.legend-row:hover strong { color: var(--brand); }
 .topbar .user-meta strong, .topbar .user-meta small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* A logo never stretches or shrinks inside flex rows */
 span.uni-logo { flex: none; }
+
+/* ---------- topographic background (signed-in pages) ---------- */
+.topo-bg {
+  position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none;
+  /* quieter under the page title, fuller towards the bottom */
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.35), #000 45%);
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.35), #000 45%);
+}
+.shell-main { position: relative; z-index: 1; }
+@media print { .topo-bg { display: none; } }
