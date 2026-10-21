@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { ArrowRightLeft, Award, CalendarDays, CircleHelp, GraduationCap, ListChecks, LogOut, Send, UserRound } from 'lucide-react';
+import { ArrowRightLeft, Award, CalendarDays, CircleHelp, GraduationCap, ListChecks, LogOut, PencilLine, Send, UserRound } from 'lucide-react';
 import api, { errMsg } from '../../api';
 import { useDialog } from '../../context/DialogContext';
 import { useShell } from '../../components/app/ShellContext';
@@ -23,6 +23,7 @@ export default function StudentClearance() {
   const { refresh } = useShell();
   const [form, setForm] = useState({ reason: 'graduation', note: '' });
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(null); // { reason, note } while editing the open request
 
   if (s.loading) return <PageSkeleton />;
   if (s.error) return <ErrorState message={s.error} onRetry={s.retry} />;
@@ -39,6 +40,21 @@ export default function StudentClearance() {
       setForm({ reason: 'graduation', note: '' });
       await s.reload();
       refresh();
+    } catch (err) {
+      toast.error(errMsg(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveEdit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await api.patch(`/clearances/${active._id}`, editing);
+      toast.success('Request updated');
+      setEditing(null);
+      await s.reload();
     } catch (err) {
       toast.error(errMsg(err));
     } finally {
@@ -103,8 +119,30 @@ export default function StudentClearance() {
               <ProgressBar value={s.pct} />
             </div>
           </div>
-          {active.items.every((i) => i.status !== 'cleared') && (
-            <button className="btn btn-ghost btn-sm" style={{ marginTop: 12 }} onClick={() => cancel(active._id)}>Cancel request</button>
+          <div className="row-gap" style={{ marginTop: 12 }}>
+            {active.items.every((i) => !i.actionedBy) && !editing && (
+              <button className="btn btn-soft btn-sm" onClick={() => setEditing({ reason: active.reason, note: active.note || '' })}><PencilLine size={14} /> Edit request</button>
+            )}
+            {active.items.every((i) => i.status !== 'cleared') && (
+              <button className="btn btn-ghost btn-sm" onClick={() => cancel(active._id)}>Cancel request</button>
+            )}
+          </div>
+          {editing && (
+            <form className="edit-request" onSubmit={saveEdit}>
+              <label className="label">Reason
+                <select className="input" value={editing.reason} onChange={(e) => setEditing({ ...editing, reason: e.target.value })}>
+                  {REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                </select>
+              </label>
+              <label className="label">Note for the departments
+                <textarea className="input" rows={3} maxLength={500} value={editing.note} onChange={(e) => setEditing({ ...editing, note: e.target.value })} />
+              </label>
+              <small className="field-hint">You can edit your request until the first department reviews it.</small>
+              <div className="row-gap">
+                <button className="btn btn-primary btn-sm" disabled={busy}>{busy ? <Spin size={14} /> : null} Save changes</button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditing(null)}>Cancel</button>
+              </div>
+            </form>
           )}
         </section>
       )}

@@ -6,6 +6,7 @@ import api, { errMsg } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { useDialog } from '../../context/DialogContext';
 import useFetch from '../../hooks/useFetch';
+import useSort from '../../hooks/useSort';
 import {
   Badge, cap, Drawer, Empty, ErrorState, fmtDate, lkr, PageHeader, PageSkeleton, Person, SearchInput, Skeleton, Spin,
 } from '../../components/ui';
@@ -26,6 +27,10 @@ export default function AdminUsers() {
   const [busy, setBusy] = useState(false);
   const summary = useFetch(edit?.role === 'student' ? `/admin/users/${edit._id}/summary` : null, { enabled: edit?.role === 'student' });
   const domains = me.university?.domains || [];
+  const { sorted, th } = useSort(list.data, { key: '', dir: 'asc' }, {
+    details: (u) => (u.role === 'officer' ? u.department?.name : u.regNo),
+    active: (u) => (u.isActive ? 0 : 1),
+  });
 
   const setParam = (k, v) => {
     const next = new URLSearchParams(params);
@@ -117,9 +122,9 @@ export default function AdminUsers() {
         {!list.data ? <PageSkeleton /> : list.data.length === 0 ? <Empty icon={Users} title="No users found" /> : (
           <div className="table-wrap">
             <table className="table-click">
-              <thead><tr><th>User</th><th>Role</th><th className="hide-sm">Details</th><th>Status</th><th style={{ textAlign: 'right' }}>Actions</th></tr></thead>
+              <thead><tr>{th('name', 'User')}{th('role', 'Role')}{th('details', 'Details', { className: 'hide-sm' })}{th('active', 'Status')}<th style={{ textAlign: 'right' }}>Actions</th></tr></thead>
               <tbody>
-                {list.data.map((u) => (
+                {sorted.map((u) => (
                   <tr key={u._id} onClick={() => setEdit({ ...u, newPassword: '' })}>
                     <td><Person name={u.name} sub={u.email} /></td>
                     <td><span className={`badge badge-role role-${u.role}`}>{ROLE_LABEL[u.role] || cap(u.role)}</span></td>

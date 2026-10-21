@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { CircleCheck, Download, FileText, Plus, Trash2, UserRoundCheck, UserRoundX, Wallet } from 'lucide-react';
+import { CircleCheck, Download, FileText, PencilLine, Plus, Trash2, UserRoundCheck, UserRoundX, Wallet } from 'lucide-react';
 import api, { errMsg, fileUrl } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { useDialog } from '../../context/DialogContext';
 import { useShell } from '../../components/app/ShellContext';
 import useFetch from '../../hooks/useFetch';
+import useSort from '../../hooks/useSort';
 import {
-  Badge, downloadCsv, Empty, ErrorState, fmtDate, lkr, PageHeader, PageSkeleton, Person, SearchInput, Spin,
+  Badge, downloadCsv, Drawer, Empty, ErrorState, fmtDate, lkr, PageHeader, PageSkeleton, Person, SearchInput, Spin,
 } from '../../components/ui';
 
 const OPEN = ['unpaid', 'receipt-submitted'];
@@ -60,6 +61,13 @@ export default function OfficerDues() {
   const { data, error, reload, refresh } = useFetch('/dues/department');
   const [form, setForm] = useState({ regNo: '', amount: '', description: '' });
   const [working, setWorking] = useState('');
+  const [edit, setEdit] = useState(null); // due being corrected
+
+  const filtered = (data || []).filter((d) => (!status || d.status === status) && (!q || d.student?.name?.toLowerCase().includes(q) || d.student?.regNo?.toLowerCase().includes(q) || d.description.toLowerCase().includes(q)));
+  const { sorted: shown, th } = useSort(filtered, { key: '', dir: 'asc' }, {
+    student: (d) => d.student?.name,
+    added: (d) => d.createdAt,
+  });
 
   const setParam = (k, v) => {
     const next = new URLSearchParams(params);
@@ -71,7 +79,6 @@ export default function OfficerDues() {
   if (error) return <ErrorState message={error} onRetry={reload} />;
   if (!data) return <PageSkeleton />;
 
-  const shown = data.filter((d) => (!status || d.status === status) && (!q || d.student?.name?.toLowerCase().includes(q) || d.student?.regNo?.toLowerCase().includes(q) || d.description.toLowerCase().includes(q)));
   const sum = (sts) => data.filter((d) => sts.includes(d.status)).reduce((s, d) => s + d.amount, 0);
 
   const after = async () => {
@@ -103,6 +110,21 @@ export default function OfficerDues() {
     try {
       const { data: res } = await api.patch(`/dues/${d._id}/verify`, body);
       toast.success(res.reopened ? `Due ${label}. The student can now be cleared.` : `Due ${label}`);
+      await after();
+    } catch (err) {
+      toast.error(errMsg(err));
+    } finally {
+      setWorking('');
+    }
+  };
+
+  const saveEdit = async (e) => {
+    e.preventDefault();
+    setWorking('edit');
+    try {
+      await api.patch(`/dues/${edit._id}`, { amount: edit.amount, description: edit.description });
+      toast.success('Due updated – the student has been told');
+      setEdit(null);
       await after();
     } catch (err) {
       toast.error(errMsg(err));
@@ -171,14 +193,15 @@ export default function OfficerDues() {
         ) : (
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Student</th><th>Description</th><th>Amount</th><th>Status</th><th className="hide-sm">Receipt</th><th style={{ textAlign: 'right' }}>Actions</th></tr></thead>
+              <thead><tr>{th('student', 'Student')}{th('description', 'Description')}{th('amount', 'Amount')}{th('status', 'Status')}{th('added', 'Added', { className: 'hide-sm' })}<th className="hide-sm">Receipt</th><th style={{ textAlign: 'right' }}>Actions</th></tr></thead>
               <tbody>
                 {shown.map((d) => (
                   <tr key={d._id}>
                     <td><Person name={d.student?.name} sub={d.student?.regNo} /></td>
-                    <td>{d.description}<div className="muted small">Added {fmtDate(d.createdAt)}{d.addedBy?.name ? ` by ${d.addedBy.name}` : ''}</div></td>
+                    <td>{d.description}{d.addedBy?.name && <div className="muted small">by {d.addedBy.name}</div>}</td>
                     <td><strong>{lkr(d.amount)}</strong></td>
                     <td><Badge status={d.status} />{d.paidAt && <div className="muted small">{fmtDate(d.paidAt)}</div>}</td>
+                    <td className="hide-sm small">{fmtDate(d.createdAt)}</td>
                     <td className="hide-sm">{d.receiptUrl ? <a className="btn btn-soft btn-sm" href={fileUrl(d.receiptUrl)} target="_blank" rel="noreferrer"><FileText size={13} /> View</a> : <span className="muted">—</span>}</td>
                     <td>
                       <div className="actions end">
@@ -192,7 +215,10 @@ export default function OfficerDues() {
                           </>
                         )}
                         {OPEN.includes(d.status) && (
-                          <button className="btn btn-ghost btn-sm" onClick={() => remove(d)} aria-label="Delete due" title="Delete (added by mistake)"><Trash2 size={14} /></button>
+                          <>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setEdit({ _id: d._id, amount: d.amount, description: d.description, student: d.student, status: d.status })} aria-label="Edit due" title="Edit amount or description"><PencilLine size={14} /></button>
+                            <button className="btn btn-ghost btn-sm" onClick={() => remove(d)} aria-label="Delete due" title="Delete (added by mistake)"><Trash2 size={14} /></button>
+                          </>
                         )}
                         {!OPEN.includes(d.status) && <span className="muted small">{d.verifiedBy?.name ? `by ${d.verifiedBy.name}` : 'Settled'}</span>}
                       </div>
@@ -204,6 +230,21 @@ export default function OfficerDues() {
           </div>
         )}
       </section>
+
+      <Drawer open={!!edit} onClose={() => setEdit(null)} title="Edit due" subtitle={edit && `${edit.student?.name} · ${edit.student?.regNo}`}>
+        {edit && (
+          <form className="form-stack" onSubmit={saveEdit}>
+            {edit.status === 'receipt-submitted' && <p className="policy-note small">The student has already uploaded a receipt for this due. If you change the amount, check the receipt again before approving it.</p>}
+            <label className="label">Amount (LKR)<input className="input" type="number" min="1" step="0.01" required value={edit.amount} onChange={(e) => setEdit({ ...edit, amount: e.target.value })} /></label>
+            <label className="label">Description<input className="input" required maxLength={200} value={edit.description} onChange={(e) => setEdit({ ...edit, description: e.target.value })} /></label>
+            <small className="field-hint">The student is notified of the change. Settled dues can't be edited.</small>
+            <div className="row-gap">
+              <button className="btn btn-primary" disabled={working === 'edit'}>{working === 'edit' ? <Spin /> : <PencilLine size={16} />} Save changes</button>
+              <button type="button" className="btn btn-ghost" onClick={() => setEdit(null)}>Cancel</button>
+            </div>
+          </form>
+        )}
+      </Drawer>
     </div>
   );
 }

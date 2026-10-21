@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Download, FileSpreadsheet, Info, Plus, Search, Trash2, Upload } from 'lucide-react';
+import { Download, FileSpreadsheet, Info, PencilLine, Plus, Search, Trash2, Upload } from 'lucide-react';
+import useSort from '../../hooks/useSort';
 import api, { errMsg } from '../../api';
 import { useDialog } from '../../context/DialogContext';
 import { useAuth } from '../../context/AuthContext';
-import { Badge, Empty, PageHeader, Skeleton } from '../../components/ui';
+import { Badge, Drawer, Empty, PageHeader, Skeleton, Spin } from '../../components/ui';
 
 /* ---------------- Official student list ---------------- */
 // Minimal CSV parser (handles quotes and commas inside quotes)
@@ -52,6 +53,24 @@ export default function AdminStudents() {
   const [result, setResult] = useState(null);
   const [importing, setImporting] = useState(false);
   const [form, setForm] = useState({ regNo: '', name: '', email: '', faculty: '' });
+  const [edit, setEdit] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const { sorted, th } = useSort(data?.rows, { key: '', dir: 'asc' });
+
+  const saveEdit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.patch(`/admin/roster/${edit._id}`, { regNo: edit.regNo, name: edit.name, email: edit.email, faculty: edit.faculty });
+      toast.success('Student record updated');
+      setEdit(null);
+      load();
+    } catch (err) {
+      toast.error(errMsg(err));
+    } finally {
+      setSaving(false);
+    }
+  };
   const { user } = useAuth();
   const domains = user.university?.domains || [];
 
@@ -189,16 +208,19 @@ export default function AdminStudents() {
         {!data ? <Skeleton h={220} r={14} /> : data.rows.length === 0 ? <Empty icon={FileSpreadsheet} title="No students on the list yet">Import a CSV from the registrar to get started.</Empty> : (
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Reg. no.</th><th>Name</th><th>University email</th><th>Faculty</th><th>Status</th><th /></tr></thead>
+              <thead><tr>{th('regNo', 'Reg. no.')}{th('name', 'Name')}{th('email', 'University email')}{th('faculty', 'Faculty')}{th('status', 'Status')}<th /></tr></thead>
               <tbody>
-                {data.rows.map((r) => (
+                {sorted.map((r) => (
                   <tr key={r._id}>
                     <td><strong>{r.regNo}</strong></td>
                     <td>{r.name}</td>
                     <td className="small">{r.email}</td>
                     <td className="small">{r.faculty || '—'}</td>
                     <td><Badge status={r.status === 'activated' ? 'activated' : 'invited'} /></td>
-                    <td>{r.status !== 'activated' && <button className="btn btn-ghost btn-sm" onClick={() => remove(r)} aria-label="Remove from list"><Trash2 size={14} /></button>}</td>
+                    <td><div className="actions end">
+                      <button className="btn btn-ghost btn-sm" onClick={() => setEdit({ ...r })} aria-label={`Edit ${r.name}`} title="Edit"><PencilLine size={14} /></button>
+                      {r.status !== 'activated' && <button className="btn btn-ghost btn-sm" onClick={() => remove(r)} aria-label="Remove from list" title="Remove"><Trash2 size={14} /></button>}
+                    </div></td>
                   </tr>
                 ))}
               </tbody>
@@ -206,6 +228,21 @@ export default function AdminStudents() {
           </div>
         )}
       </section>
+      <Drawer open={!!edit} onClose={() => setEdit(null)} title="Edit student record" subtitle={edit && `${edit.regNo} · ${edit.status === 'activated' ? 'account created' : 'not registered yet'}`}>
+        {edit && (
+          <form className="form-stack" onSubmit={saveEdit}>
+            {edit.status === 'activated' && <p className="policy-note small">This student already has an account, so the registration number and email are locked. Name and faculty changes also update their account.</p>}
+            <label className="label">Registration no.<input className="input" required disabled={edit.status === 'activated'} value={edit.regNo} onChange={(e) => setEdit({ ...edit, regNo: e.target.value })} /></label>
+            <label className="label">Full name<input className="input" required value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></label>
+            <label className="label">University email<input className="input" type="email" required disabled={edit.status === 'activated'} value={edit.email} onChange={(e) => setEdit({ ...edit, email: e.target.value })} /></label>
+            <label className="label">Faculty<input className="input" value={edit.faculty || ''} onChange={(e) => setEdit({ ...edit, faculty: e.target.value })} /></label>
+            <div className="row-gap">
+              <button className="btn btn-primary" disabled={saving}>{saving ? <Spin /> : <PencilLine size={16} />} Save changes</button>
+              <button type="button" className="btn btn-ghost" onClick={() => setEdit(null)}>Cancel</button>
+            </div>
+          </form>
+        )}
+      </Drawer>
     </div>
   );
 }

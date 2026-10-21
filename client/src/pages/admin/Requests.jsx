@@ -6,6 +6,7 @@ import api, { errMsg, fileUrl } from '../../api';
 import { useDialog } from '../../context/DialogContext';
 import { useShell } from '../../components/app/ShellContext';
 import useFetch from '../../hooks/useFetch';
+import useSort from '../../hooks/useSort';
 import {
   ActivityList, Badge, cap, downloadCsv, Drawer, Empty, ErrorState, fmtDate, fmtDateTime, lkr, MiniProgress, PageHeader, PageSkeleton, Person, SearchInput, Skeleton, Spin,
 } from '../../components/ui';
@@ -31,6 +32,10 @@ export default function AdminRequests() {
   const detail = useFetch(openId ? `/admin/requests/${openId}` : null, { enabled: !!openId });
   const [working, setWorking] = useState('');
   const [downloading, setDownloading] = useState(false);
+  const { sorted, th } = useSort(list.data, { key: '', dir: 'asc' }, {
+    student: (r) => r.student?.name,
+    progress: (r) => (r.items.length ? r.items.filter((i) => i.status === 'cleared').length / r.items.length : 0),
+  });
 
   const setParam = (k, v) => {
     const next = new URLSearchParams(params);
@@ -115,9 +120,9 @@ export default function AdminRequests() {
         {!list.data ? <PageSkeleton /> : list.data.length === 0 ? <Empty icon={ClipboardList} title="No requests">Nothing matches these filters.</Empty> : (
           <div className="table-wrap">
             <table className="table-click">
-              <thead><tr><th>Student</th><th className="hide-sm">Reason</th><th className="hide-sm">Submitted</th><th>Departments</th><th className="hide-md">Progress</th><th>Status</th></tr></thead>
+              <thead><tr>{th('student', 'Student')}{th('reason', 'Reason', { className: 'hide-sm' })}{th('createdAt', 'Submitted', { className: 'hide-sm' })}<th>Departments</th>{th('progress', 'Progress', { className: 'hide-md' })}{th('status', 'Status')}</tr></thead>
               <tbody>
-                {list.data.map((r) => (
+                {sorted.map((r) => (
                   <tr key={r._id} onClick={() => setParam('open', r._id)} className={openId === r._id ? 'row-active' : ''}>
                     <td><Person name={r.student?.name} sub={`${r.student?.regNo} · ${r.student?.faculty}`} /></td>
                     <td className="hide-sm">{cap(r.reason)}</td>
