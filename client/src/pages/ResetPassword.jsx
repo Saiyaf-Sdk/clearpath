@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, ArrowRight, CircleAlert, Eye, EyeOff, Lock, LockKeyhole, ShieldCheck, Timer } from 'lucide-react';
 import api, { errMsg } from '../api';
+import { loginPath } from '../utils/portal';
 import { Field, PasswordStrength, Skeleton, Spin } from '../components/ui';
 import AuthLayout, { FormError } from '../components/AuthLayout';
 
@@ -34,10 +35,13 @@ export default function ResetPassword() {
   const [show, setShow] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [portal, setPortal] = useState(null);
+  // Back to the right university portal (or the chooser / platform page)
+  const loginHere = portal ? `/portal/${portal.slug}` : loginPath();
 
   useEffect(() => {
     api.get(`/auth/reset-password/${token}`)
-      .then(({ data }) => { setEmail(data.email); setStatus('ready'); })
+      .then(({ data }) => { setEmail(data.email); setPortal(data.university); setStatus('ready'); })
       .catch(() => setStatus('invalid'));
   }, [token]);
 
@@ -84,7 +88,7 @@ export default function ResetPassword() {
               <p>Reset links work once and only for 15 minutes. Request a new one to continue.</p>
             </div>
             <Link to="/forgot-password" className="btn btn-primary btn-lg btn-block">Request a new link <ArrowRight size={18} className="arrow" /></Link>
-            <Link to="/login" className="auth-back"><ArrowLeft size={16} /> Back to log in</Link>
+            <Link to={loginHere} className="auth-back"><ArrowLeft size={16} /> Back to log in</Link>
           </motion.div>
         )}
 
@@ -104,7 +108,7 @@ export default function ResetPassword() {
             <button className="btn btn-primary btn-lg btn-block" disabled={busy}>
               {busy ? <><Spin /> Saving…</> : <>Update password <ArrowRight size={18} className="arrow" /></>}
             </button>
-            <Link to="/login" className="auth-back"><ArrowLeft size={16} /> Back to log in</Link>
+            <Link to={loginHere} className="auth-back"><ArrowLeft size={16} /> Back to log in</Link>
           </motion.form>
         )}
 
@@ -115,7 +119,7 @@ export default function ResetPassword() {
               <h2>Password updated</h2>
               <p>Your password has been changed. Log in with your new password to continue.</p>
             </div>
-            <button type="button" className="btn btn-primary btn-lg btn-block" onClick={() => navigate('/login')}>
+            <button type="button" className="btn btn-primary btn-lg btn-block" onClick={() => navigate(loginHere)}>
               Continue to log in <ArrowRight size={18} className="arrow" />
             </button>
           </motion.div>

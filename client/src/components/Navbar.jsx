@@ -203,7 +203,7 @@ export default function Navbar() {
           ) : (
             <div className="desktop-only row-gap">
               <Link to="/login" className="btn btn-ghost btn-sm"><LogIn size={15} /> Log in</Link>
-              <Link to="/register" className="btn btn-primary btn-sm">Get started</Link>
+              <Link to="/portal?next=register" className="btn btn-primary btn-sm">Get started</Link>
             </div>
           )}
 

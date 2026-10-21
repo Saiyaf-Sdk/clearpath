@@ -136,7 +136,8 @@ app.use(errorHandler);
 /* ---------- Start ---------- */
 const PORT = process.env.PORT || 5000;
 let server;
-connectDB().then(() => {
+connectDB().then(async () => {
+  await require('./utils/bootstrap')();
   server = app.listen(PORT, () => {
     console.log(`ClearPath API running on port ${PORT}${serveClient ? ' (also serving the web app)' : ''}`);
   });

@@ -2,7 +2,7 @@ const University = require('../models/University');
 const User = require('../models/User');
 const EnrolledStudent = require('../models/EnrolledStudent');
 const { asyncHandler, ApiError } = require('../middleware/error');
-const { universityForEmail, publicUniversity, emailBelongsTo } = require('../utils/policy');
+const { universityForEmail, universityForPortal, publicUniversity, emailBelongsTo, RESERVED } = require('../utils/policy');
 const { audit } = require('../utils/helpers');
 const { saveUpload, removeByUrl } = require('../utils/files');
 
@@ -21,11 +21,23 @@ exports.lookup = asyncHandler(async (req, res) => {
   res.json(publicUniversity(university));
 });
 
+// GET /api/universities/:portal  – one university's portal details (logo, name, email domains)
+exports.getPortal = asyncHandler(async (req, res) => {
+  const university = await universityForPortal(req.params.portal);
+  if (!university) throw new ApiError(404, 'We could not find this university portal');
+  if (!university.isActive) throw new ApiError(403, `${university.name} is not active on ClearPath yet`);
+  res.json(publicUniversity(university));
+});
+
 /* ---------- Platform admin ---------- */
 
 const pick = (b) => {
   const out = {};
   ['name', 'shortName', 'code', 'website', 'isActive'].forEach((k) => { if (b[k] !== undefined) out[k] = b[k]; });
+  if (b.slug !== undefined) {
+    out.slug = String(b.slug).toLowerCase().trim().replace(/\s+/g, '-') || undefined;
+    if (out.slug && RESERVED.includes(out.slug)) throw new ApiError(400, `"${out.slug}" can't be used as a portal address`);
+  }
   if (b.domains !== undefined) {
     out.domains = Array.isArray(b.domains) ? b.domains : String(b.domains).split(',');
   }
@@ -57,6 +69,7 @@ exports.listAll = asyncHandler(async (req, res) => {
 exports.create = asyncHandler(async (req, res) => {
   const data = pick(req.body);
   if (!data.name || !data.code) throw new ApiError(400, 'Name and code are required');
+  if (!data.slug) data.slug = String(data.code).toLowerCase();
   if (!data.domains?.length) throw new ApiError(400, 'Add at least one email domain (e.g. ruh.ac.lk)');
   await checkDomains(data.domains);
   const uni = await University.create(data);

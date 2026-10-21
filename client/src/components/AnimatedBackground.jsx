@@ -31,7 +31,7 @@ const PALETTES = {
 
 export const sceneFor = (path) => {
   if (path === '/') return 'landing';
-  if (['/login', '/register', '/forgot-password'].includes(path) || path.startsWith('/reset-password')) return 'auth';
+  if (['/login', '/register', '/forgot-password', '/platform-login'].includes(path) || path.startsWith('/reset-password') || path.startsWith('/portal')) return 'auth';
   if (path.startsWith('/verify') || path === '/help') return 'info';
   return 'app';
 };

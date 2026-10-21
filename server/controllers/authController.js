@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const User = require('../models/User');
 const EnrolledStudent = require('../models/EnrolledStudent');
-const { universityForEmail, publicUniversity, devMode, maskEmail } = require('../utils/policy');
+const { universityForEmail, universityForPortal, publicUniversity, devMode, maskEmail } = require('../utils/policy');
 const { asyncHandler, ApiError } = require('../middleware/error');
 const { signToken, audit, appUrl } = require('../utils/helpers');
 const { sendMail } = require('../utils/mailer');
@@ -26,9 +26,24 @@ const publicUser = (u) => ({
    2. /register/verify   checks the code, returns the student's official name/faculty to confirm identity
    3. /register/complete code + password → creates the account (name/faculty come from the official list)
 ------------------------------------------------------------------- */
-// The university is decided by the email domain, then the student must be on THAT university's list
-const findEnrolled = async (regNo, email, withOtp = false) => {
+// The university portal the student opened must match their email domain, and the student
+// must be on THAT university's official list.
+const portalMismatch = (emailUni, portalUni) =>
+  new ApiError(400, `This email belongs to ${emailUni.name}. Please create your account on the ${emailUni.shortName || emailUni.name} portal.`, {
+    code: 'WRONG_PORTAL',
+    portal: publicUniversity(emailUni),
+  });
+
+const findEnrolled = async (regNo, email, withOtp = false, portal) => {
   const university = await universityForEmail(email);
+  if (portal) {
+    const portalUni = await universityForPortal(portal);
+    if (!portalUni) throw new ApiError(404, 'University portal not found');
+    if (!university) {
+      throw new ApiError(400, `Please use your ${portalUni.name} email (${portalUni.domains.map((d) => '@' + d).join(' or ')}).`);
+    }
+    if (String(university._id) !== String(portalUni._id)) throw portalMismatch(university, portalUni);
+  }
   if (!university) return { university: null, entry: null };
   const q = EnrolledStudent.findOne({ university: university._id, regNo: String(regNo || '').toUpperCase().trim() });
   if (withOtp) q.select('+otpHash');
@@ -42,8 +57,8 @@ const accountExists = (entry) =>
 
 const NOT_A_UNIVERSITY = "This email doesn't belong to a university on ClearPath. Please use your university email (for example name@ruh.ac.lk).";
 
-const checkCode = async (regNo, email, code) => {
-  const { university, entry } = await findEnrolled(regNo, email, true);
+const checkCode = async (regNo, email, code, portal) => {
+  const { university, entry } = await findEnrolled(regNo, email, true, portal);
   if (!entry || !entry.otpHash) throw new ApiError(400, 'Please request a new verification code.');
   if (!entry.otpExpires || entry.otpExpires < new Date()) throw new ApiError(400, 'This code has expired. Please request a new one.');
   if (entry.otpAttempts >= 5) throw new ApiError(429, 'Too many incorrect attempts. Please request a new code.');
@@ -55,11 +70,11 @@ const checkCode = async (regNo, email, code) => {
   return { university, entry };
 };
 
-// POST /api/auth/register/start  body: { regNo, email }
+// POST /api/auth/register/start  body: { university (portal), regNo, email }
 exports.registerStart = asyncHandler(async (req, res) => {
-  const { regNo, email } = req.body;
+  const { regNo, email, university: portal } = req.body;
   if (!regNo || !email) throw new ApiError(400, 'Registration number and university email are required');
-  const { university, entry } = await findEnrolled(regNo, email);
+  const { university, entry } = await findEnrolled(regNo, email, false, portal);
   if (!university) throw new ApiError(400, NOT_A_UNIVERSITY);
   if (!entry) {
     throw new ApiError(404, `We couldn't find this registration number with this email on the ${university.name} student list. Check both, or contact your Student Affairs office.`);
@@ -95,16 +110,16 @@ exports.registerStart = asyncHandler(async (req, res) => {
 
 // POST /api/auth/register/verify  body: { regNo, email, code }
 exports.registerVerify = asyncHandler(async (req, res) => {
-  const { regNo, email, code } = req.body;
-  const { university, entry } = await checkCode(regNo, email, code);
+  const { regNo, email, code, university: portal } = req.body;
+  const { university, entry } = await checkCode(regNo, email, code, portal);
   res.json({ name: entry.name, faculty: entry.faculty, regNo: entry.regNo, university: publicUniversity(university) });
 });
 
 // POST /api/auth/register/complete  body: { regNo, email, code, password, phone }
 exports.registerComplete = asyncHandler(async (req, res) => {
-  const { regNo, email, code, password, phone } = req.body;
+  const { regNo, email, code, password, phone, university: portal } = req.body;
   if (!password || password.length < 6) throw new ApiError(400, 'Password must be at least 6 characters');
-  const { university, entry } = await checkCode(regNo, email, code);
+  const { university, entry } = await checkCode(regNo, email, code, portal);
   if (await accountExists(entry)) throw new ApiError(409, 'An account already exists for this student. Please log in.');
 
   const user = await User.create({
@@ -130,9 +145,11 @@ exports.registerComplete = asyncHandler(async (req, res) => {
   res.status(201).json({ token: signToken(user), user: publicUser(user) });
 });
 
-// POST /api/auth/login
+// POST /api/auth/login  body: { email, password, university (portal) }
+// Students, officers and admins sign in on their own university's portal.
+// The platform admin signs in on the separate platform page (no university).
 exports.login = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, university: portal } = req.body;
   if (!email || !password) throw new ApiError(400, 'Email and password are required');
 
   const user = await User.findOne({ email: String(email).toLowerCase().trim() })
@@ -143,6 +160,24 @@ exports.login = asyncHandler(async (req, res) => {
   if (!user.isActive) throw new ApiError(403, 'Your account has been disabled');
   if (user.role !== 'superadmin' && user.university && !user.university.isActive) {
     throw new ApiError(403, 'Your university is not active on ClearPath yet');
+  }
+
+  // Right person, right door (checked only after the password, so nothing leaks to strangers)
+  if (user.role === 'superadmin') {
+    if (portal) throw new ApiError(400, 'Platform administrators sign in on the Platform admin page.', { code: 'PLATFORM_LOGIN' });
+  } else {
+    const own = user.university;
+    if (!own) throw new ApiError(403, 'This account is not linked to a university. Contact the administrator.');
+    if (!portal) {
+      throw new ApiError(400, `Please sign in through the ${own.shortName || own.name} portal.`, { code: 'CHOOSE_PORTAL', portal: publicUniversity(own) });
+    }
+    const portalUni = await universityForPortal(portal);
+    if (!portalUni || String(portalUni._id) !== String(own._id)) {
+      throw new ApiError(400, `This account belongs to ${own.name}. Please sign in on the ${own.shortName || own.name} portal.`, {
+        code: 'WRONG_PORTAL',
+        portal: publicUniversity(own),
+      });
+    }
   }
 
   res.json({ token: signToken(user), user: publicUser(user) });
@@ -214,9 +249,9 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
 
 // GET /api/auth/reset-password/:token  -> is the link still valid?
 exports.checkResetToken = asyncHandler(async (req, res) => {
-  const user = await User.findOne({ resetPasswordToken: sha256(req.params.token), resetPasswordExpires: { $gt: new Date() } });
+  const user = await User.findOne({ resetPasswordToken: sha256(req.params.token), resetPasswordExpires: { $gt: new Date() } }).populate('university');
   if (!user) throw new ApiError(400, 'This reset link is invalid or has expired.');
-  res.json({ valid: true, email: user.email });
+  res.json({ valid: true, email: user.email, university: user.university ? publicUniversity(user.university) : null });
 });
 
 // POST /api/auth/reset-password/:token  body: { password }

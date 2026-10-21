@@ -1,11 +1,13 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { homeFor, useAuth } from '../context/AuthContext';
+import { loginPath } from '../utils/portal';
 
 // Only signed-in users; others go to the login page and come back here afterwards
 export default function RequireAuth({ children }) {
   const { user } = useAuth();
   const location = useLocation();
-  if (!user) return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}` }} />;
+  // Not signed in: go to the university portal (or the chooser), then come back here
+  if (!user) return <Navigate to={loginPath()} replace state={{ from: `${location.pathname}${location.search}` }} />;
   return children;
 }
 

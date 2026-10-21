@@ -65,9 +65,10 @@ export default function Help() {
           <Reveal className="card help-section" amount={0.1}>
             <section id="start">
               <h2><Rocket size={20} className="text-brand" /> Getting started</h2>
-              <p className="muted">ClearPath serves all state universities. Everyone logs in on the same page with their university email, and the email decides which university portal opens.</p>
+              <p className="muted">ClearPath serves all state universities. Each university has its own portal: choose your university first, then log in or create your account there with your university email.</p>
               <ol className="guide-steps">
-                <li><div><strong>Students</strong>Create your account from <Link to="/register">Create account</Link>. Enter your registration number and university email, type the 6-digit code we email you, then choose a password. Only students on the university's official list can register.</div></li>
+                <li><div><strong>Choose your university first</strong>Press <Link to="/portal">Log in</Link> and pick your university. Each university has its own portal with its own log-in and create-account pages.</div></li>
+                <li><div><strong>Students</strong>On your university's portal open <em>Create account</em>. Enter your registration number, university email and a password, then type the 6-digit code we email you. Only students on the university's official list can register.</div></li>
                 <li><div><strong>Department officers</strong>Your account is created by the administrator and linked to your department (e.g. Library).</div></li>
                 <li><div><strong>Administrators</strong>Manage departments, staff accounts and the overall process from the admin console.</div></li>
               </ol>
@@ -150,7 +151,7 @@ export default function Help() {
               <h2><Mail size={20} className="text-brand" /> Still need help?</h2>
               <p className="muted">Contact the Student Affairs office or your faculty registrar. Include your registration number and a short description of the problem.</p>
               <div className="row-gap" style={{ marginTop: 16 }}>
-                <Link to="/login" className="btn btn-primary">Log in to ClearPath</Link>
+                <Link to="/portal" className="btn btn-primary">Choose your university</Link>
                 <Link to="/" className="btn btn-ghost">Back to home</Link>
               </div>
             </section>

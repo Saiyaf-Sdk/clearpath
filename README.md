@@ -16,7 +16,7 @@ One platform serves **all 17 Sri Lankan state universities**: a user's universit
 | **Department officer** | Overview (workload, 14-day chart, money collected, average turnaround, oldest requests, recent activity) · Clearance requests (filter, search, sort, side panel, bulk clear, CSV export) · Receipts to verify · Dues register (add dues with live student check, settle, waive, export) · Activity history |
 | **University admin** | Overview (KPIs and charts) · All requests (filters, full history drawer, admin override, CSV) · Reports (faculty, reason, dues by department, print / CSV) · Official student list (CSV import) · Users & staff · Departments · Audit log |
 | **Platform admin** | Overview of all universities · Universities (domains, logos, first admin) · Platform audit log |
-| **Everyone** | Landing page, verified registration (student list + university email + 6-digit code), login with "keep me signed in", forgot / reset password, certificate verification, help centre, notifications bell, account settings, dark mode |
+| **Everyone** | Landing page, choose-your-university page with a separate portal per university, verified registration (student list + university email + 6-digit code), login with "keep me signed in", forgot / reset password, certificate verification, help centre, notifications bell, account settings, dark mode |
 
 **Engineering:** JWT auth with role-based access · per-university data isolation · bcrypt passwords · Helmet security headers and CSP · CORS whitelist · brute-force rate limiting on sign-in routes · uploads stored in MongoDB (survive hosting restarts) · audit log of every action · in-app + email notifications · lazy-loaded pages · error boundaries (a crashing page never blanks the app) · every page has its own URL (refresh and back button work) · health check endpoint · graceful shutdown.
 
@@ -54,6 +54,8 @@ npm run dev      # opens http://localhost:5173
 `client/.env` should contain `VITE_API_URL=http://localhost:5000`.
 
 ### 2d. Demo accounts (password for all: `password123`)
+**Signing in:** press **Log in** → choose the university (each university has its own portal, e.g. `/portal/ruhuna`) → log in or create an account there. The platform admin uses **Platform administrator sign-in** at the bottom of the university list (`/platform-login`). Each university has its own admin, created by the platform admin under **Universities**.
+
 | Who | Email | What you'll see |
 | --- | --- | --- |
 | Student | `demo.kasun@ruh.ac.lk` | Request in progress, LKR 450 library fine |
@@ -65,7 +67,9 @@ npm run dev      # opens http://localhost:5173
 | Platform admin | `platform@clearpath.lk` | All universities |
 | Register a new student | Reg. no `EG/2021/4519` + `demo.amal@ruh.ac.lk` | The 6-digit code is shown on screen (no email set up) |
 
-`npm run seed` wipes the database each time. While `npm run dev` runs, the login page has a **Demo access** panel that fills these in.
+`npm run seed` wipes the database each time.
+
+**Fresh start without demo data:** `npm run reset -- --yes` (in `server`) deletes everything and keeps only the 17 universities and a platform admin (a strong password is printed; or add `--email you@x.com --password "YourPass123"`). Add `--empty` to leave the database completely empty. `npm run seed` brings the demo data back. While `npm run dev` runs, the login page has a **Demo access** panel that fills these in.
 
 ---
 

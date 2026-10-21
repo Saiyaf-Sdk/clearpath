@@ -7,7 +7,7 @@ import { useDialog } from '../../context/DialogContext';
 import { item, stagger } from '../../components/Page';
 import { Badge, Drawer, Empty, PageHeader, PageSkeleton, Spin, StatCard, UniLogo } from '../../components/ui';
 
-const emptyUni = { name: '', shortName: '', code: '', domains: '', website: '' };
+const emptyUni = { name: '', shortName: '', code: '', slug: '', domains: '', website: '' };
 
 /*
   Platform admin: manages the universities on ClearPath.
@@ -82,6 +82,7 @@ export default function PlatformUniversities() {
               <label className="label">Full name<input className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
               <label className="label">Short name<input className="input" value={form.shortName} onChange={(e) => setForm({ ...form, shortName: e.target.value })} placeholder="Shown in the top bar" /></label>
               <label className="label">Code<input className="input" required maxLength={6} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="e.g. UOR" /></label>
+              <label className="label">Portal address<input className="input" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="e.g. ruhuna → /portal/ruhuna" /></label>
               <label className="label span-2">Email domains (comma separated)<input className="input" required value={form.domains} onChange={(e) => setForm({ ...form, domains: e.target.value })} placeholder="ruh.ac.lk" /></label>
               <label className="label">Website<input className="input" value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} /></label>
               <div className="row-gap"><button className="btn btn-primary">Add</button><button type="button" className="btn btn-ghost" onClick={() => setShowAdd(false)}>Cancel</button></div>
@@ -101,7 +102,7 @@ export default function PlatformUniversities() {
         {shown.length === 0 ? <Empty icon={Building2} title="No universities match" /> : (
           <div className="table-wrap">
             <table>
-              <thead><tr><th>University</th><th>Email domains</th><th>Students</th><th>Admins</th><th>Status</th><th /></tr></thead>
+              <thead><tr><th>University</th><th>Portal</th><th className="hide-sm">Email domains</th><th>University admin</th><th className="hide-sm">Students</th><th>Status</th><th /></tr></thead>
               <tbody>
                 {shown.map((u) => (
                   <tr key={u._id} style={{ cursor: 'pointer' }} onClick={() => setSelected(u._id)}>
@@ -111,9 +112,10 @@ export default function PlatformUniversities() {
                         <div><strong>{u.name}</strong><small>{u.code}</small></div>
                       </div>
                     </td>
-                    <td className="small">{u.domains.map((d) => `@${d}`).join(', ')}</td>
-                    <td>{u.stats.students}<div className="muted small">{u.stats.onList} on list</div></td>
-                    <td>{u.stats.admins}</td>
+                    <td className="small"><a href={`/portal/${u.slug || u.code.toLowerCase()}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>/portal/{u.slug || u.code.toLowerCase()}</a></td>
+                    <td className="small hide-sm">{u.domains.map((d) => `@${d}`).join(', ')}</td>
+                    <td>{u.stats.admins > 0 ? <span className="badge badge-active">{u.stats.admins} admin{u.stats.admins > 1 ? 's' : ''}</span> : <span className="badge badge-dues">No admin yet</span>}</td>
+                    <td className="hide-sm">{u.stats.students}<div className="muted small">{u.stats.onList} on list</div></td>
                     <td><Badge status={u.isActive ? 'active' : 'inactive'} /></td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <button className="btn btn-ghost btn-sm" onClick={() => toggle(u)}>{u.isActive ? 'Deactivate' : 'Activate'}</button>
@@ -140,7 +142,7 @@ function UniversityDrawer({ uni, onClose, onChanged }) {
 
   useEffect(() => {
     if (!uni) return;
-    setEdit({ name: uni.name, shortName: uni.shortName || '', code: uni.code, domains: uni.domains.join(', '), website: uni.website || '' });
+    setEdit({ name: uni.name, shortName: uni.shortName || '', code: uni.code, slug: uni.slug || uni.code.toLowerCase(), domains: uni.domains.join(', '), website: uni.website || '' });
     setAdminForm({ name: '', email: '', password: '' });
     api.get(`/platform/universities/${uni._id}/admins`).then((r) => setAdmins(r.data)).catch(() => setAdmins([]));
   }, [uni?._id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -208,6 +210,31 @@ function UniversityDrawer({ uni, onClose, onChanged }) {
       {uni && (
         <>
           <div>
+            <div className="section-title">University admins</div>
+            <p className="muted small" style={{ marginBottom: 10 }}>Each university has its own admin. They manage only {uni.shortName || uni.name}: departments, officers, the official student list, requests and reports. They sign in on <a href={`/portal/${uni.slug || uni.code.toLowerCase()}`} target="_blank" rel="noreferrer">/portal/{uni.slug || uni.code.toLowerCase()}</a>.</p>
+            {admins.length === 0 ? (
+              <p className="policy-note small">No admin yet – this portal can't be used until you add one (for example the registrar or Student Affairs).</p>
+            ) : (
+              <div className="row-list" style={{ marginBottom: 12 }}>
+                {admins.map((a) => (
+                  <div key={a._id} className="officer-row">
+                    <span className="avatar">{a.name.split(' ').map((p) => p[0]).slice(0, 2).join('')}</span>
+                    <div className="grow"><strong>{a.name}</strong><small>{a.email}</small></div>
+                    <Badge status={a.isActive ? 'active' : 'inactive'} />
+                  </div>
+                ))}
+              </div>
+            )}
+            <form className="auth-form-stack" style={{ gap: 10, marginTop: 10 }} onSubmit={addAdmin}>
+              <div className="grid-2">
+                <input className="input" required placeholder="Full name" value={adminForm.name} onChange={(e) => setAdminForm({ ...adminForm, name: e.target.value })} />
+                <input className="input" required type="email" placeholder={`name@${uni.domains[0] || 'university.ac.lk'}`} value={adminForm.email} onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })} />
+              </div>
+              <input className="input" required minLength={6} placeholder="Temporary password (they can change it later)" value={adminForm.password} onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })} />
+              <div><button className="btn btn-soft btn-sm" disabled={busy === 'admin'}>{busy === 'admin' ? <Spin /> : <UserPlus size={15} />} Add university admin</button></div>
+            </form>
+          </div>
+          <div>
             <div className="section-title">Logo</div>
             <div className="row-gap" style={{ gap: 14 }}>
               <UniLogo university={uni} size={72} />
@@ -230,6 +257,8 @@ function UniversityDrawer({ uni, onClose, onChanged }) {
                 <label className="label">Short name<input className="input" value={edit.shortName} onChange={(e) => setEdit({ ...edit, shortName: e.target.value })} /></label>
                 <label className="label">Code<input className="input" required maxLength={6} value={edit.code} onChange={(e) => setEdit({ ...edit, code: e.target.value })} /></label>
               </div>
+              <label className="label">Portal address<input className="input" required value={edit.slug} onChange={(e) => setEdit({ ...edit, slug: e.target.value })} /></label>
+              <small className="muted">Students and staff open {window.location.origin}/portal/{edit.slug || '…'}</small>
               <label className="label">Email domains (comma separated)<input className="input" required value={edit.domains} onChange={(e) => setEdit({ ...edit, domains: e.target.value })} /></label>
               <small className="muted">Sub-domains match automatically: ruh.ac.lk also covers stu.ruh.ac.lk.</small>
               <label className="label">Website<input className="input" value={edit.website} onChange={(e) => setEdit({ ...edit, website: e.target.value })} /></label>
@@ -237,30 +266,6 @@ function UniversityDrawer({ uni, onClose, onChanged }) {
             </div>
           </form>
 
-          <div>
-            <div className="section-title">University admins</div>
-            {admins.length === 0 ? (
-              <p className="muted small">No admin yet. Add the registrar or Student Affairs contact so they can set up departments, officers and the student list.</p>
-            ) : (
-              <div className="row-list" style={{ marginBottom: 12 }}>
-                {admins.map((a) => (
-                  <div key={a._id} className="officer-row">
-                    <span className="avatar">{a.name.split(' ').map((p) => p[0]).slice(0, 2).join('')}</span>
-                    <div className="grow"><strong>{a.name}</strong><small>{a.email}</small></div>
-                    <Badge status={a.isActive ? 'active' : 'inactive'} />
-                  </div>
-                ))}
-              </div>
-            )}
-            <form className="auth-form-stack" style={{ gap: 10, marginTop: 10 }} onSubmit={addAdmin}>
-              <div className="grid-2">
-                <input className="input" required placeholder="Full name" value={adminForm.name} onChange={(e) => setAdminForm({ ...adminForm, name: e.target.value })} />
-                <input className="input" required type="email" placeholder={`name@${uni.domains[0] || 'university.ac.lk'}`} value={adminForm.email} onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })} />
-              </div>
-              <input className="input" required minLength={6} placeholder="Temporary password (they can change it later)" value={adminForm.password} onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })} />
-              <div><button className="btn btn-soft btn-sm" disabled={busy === 'admin'}>{busy === 'admin' ? <Spin /> : <UserPlus size={15} />} Add university admin</button></div>
-            </form>
-          </div>
         </>
       )}
     </Drawer>

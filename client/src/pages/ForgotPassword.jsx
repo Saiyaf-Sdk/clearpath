@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, ArrowRight, CircleAlert, KeyRound, Mail, MailCheck, ShieldCheck, Timer } from 'lucide-react';
 import api, { errMsg } from '../api';
@@ -14,6 +14,9 @@ const POINTS = [
 ];
 
 export default function ForgotPassword() {
+  const [params] = useSearchParams();
+  const portal = params.get('portal');
+  const back = portal ? `/portal/${portal}` : '/login';
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const [devUrl, setDevUrl] = useState('');
@@ -61,7 +64,7 @@ export default function ForgotPassword() {
             <button className="btn btn-primary btn-lg btn-block" disabled={busy}>
               {busy ? <><Spin /> Sending link…</> : <>Send reset link <ArrowRight size={18} className="arrow" /></>}
             </button>
-            <Link to="/login" className="auth-back"><ArrowLeft size={16} /> Back to log in</Link>
+            <Link to={back} className="auth-back"><ArrowLeft size={16} /> Back to log in</Link>
           </motion.form>
         ) : (
           <motion.div key="sent" className="auth-form-stack auth-success" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.35, ease: EASE }}>
@@ -88,7 +91,7 @@ export default function ForgotPassword() {
               {busy ? <Spin /> : cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend link'}
             </button>
             <button type="button" className="auth-back" onClick={() => { setSent(false); setDevUrl(''); }}>Use a different email</button>
-            <Link to="/login" className="auth-back"><ArrowLeft size={16} /> Back to log in</Link>
+            <Link to={back} className="auth-back"><ArrowLeft size={16} /> Back to log in</Link>
           </motion.div>
         )}
       </AnimatePresence>

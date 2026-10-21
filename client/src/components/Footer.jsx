@@ -32,8 +32,9 @@ export function SiteFooter() {
         </div>
         <div className="footer-col">
           <h4>Get started</h4>
-          <Link to="/register">Create student account</Link>
-          <Link to="/login">Log in</Link>
+          <Link to="/portal">Choose your university</Link>
+          <Link to="/portal?next=register">Create student account</Link>
+          <Link to="/platform-login">Platform admin</Link>
           <Link to="/verify">Verify a certificate</Link>
           <Link to="/help">Help centre</Link>
         </div>

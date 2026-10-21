@@ -3,9 +3,11 @@ const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, ne
 
 // Throw this to send a specific HTTP status + message
 class ApiError extends Error {
-  constructor(status, message) {
+  // extra: optional fields sent with the message, e.g. { code: 'WRONG_PORTAL', portal: {...} }
+  constructor(status, message, extra) {
     super(message);
     this.status = status;
+    this.extra = extra;
   }
 }
 
@@ -32,7 +34,7 @@ const errorHandler = (err, req, res, next) => {
   }
 
   if (status === 500) console.error(err);
-  res.status(status).json({ message });
+  res.status(status).json({ message, ...(err.extra || {}) });
 };
 
 module.exports = { asyncHandler, ApiError, notFound, errorHandler };

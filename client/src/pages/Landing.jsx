@@ -72,8 +72,8 @@ const SECURITY = [
 ];
 
 const FAQS = [
-  ['Who can use ClearPath?', 'Students and staff of Sri Lanka’s state universities. Each university has its own portal: your university email (for example name@ruh.ac.lk) decides which one you enter. Only students on their university’s official student list can create an account, and officers and admins are added by their own university.'],
-  ['Can a student from one university get into another university’s portal?', 'No. The email domain decides the portal, the registration number must be on that university’s own student list, and a one-time code sent to the email proves it belongs to the student. Each university only ever sees its own students, departments and dues.'],
+  ['Who can use ClearPath?', 'Students and staff of Sri Lanka’s state universities. Each university has its own portal: you choose your university first, then log in or create your account with your university email (for example name@ruh.ac.lk). Only students on their university’s official student list can create an account, and officers and admins are added by their own university.'],
+  ['Can a student from one university get into another university’s portal?', 'No. Each portal only accepts its own university’s email domain, the registration number must be on that university’s own student list, and a one-time code sent to the email proves it belongs to the student. Each university only ever sees its own students, departments and dues.'],
   ['Do I still need to visit any offices?', 'Only if you choose to pay a due in person. Requesting clearance, tracking it, uploading receipts and downloading your certificate all happen online.'],
   ['What happens if a department finds a due?', 'Your tracker shows “Dues found” with the reason and amount. Pay it, upload the receipt, and the officer verifies it and clears you — only that department needs to act again.'],
   ['How long does clearance take?', 'It depends on how quickly each office reviews, but all departments work in parallel, so you are never waiting for one office to pass a paper form to the next.'],
@@ -285,7 +285,7 @@ function Hero() {
               {user ? (
                 <Magnetic><Link to={homeFor(user.role)} className="btn btn-primary btn-lg">Go to my dashboard <ArrowRight size={18} className="arrow" /></Link></Magnetic>
               ) : (
-                <Magnetic><Link to="/register" className="btn btn-primary btn-lg">Start my clearance <ArrowRight size={18} className="arrow" /></Link></Magnetic>
+                <Magnetic><Link to="/portal?next=register" className="btn btn-primary btn-lg">Start my clearance <ArrowRight size={18} className="arrow" /></Link></Magnetic>
               )}
               <Magnetic><button className="btn btn-ghost btn-lg" onClick={() => scrollTo('how')}>See how it works</button></Magnetic>
             </motion.div>
@@ -670,8 +670,8 @@ function FinalCTA() {
               <Magnetic><Link to={homeFor(user.role)} className="btn btn-white btn-lg">Go to my dashboard <ArrowRight size={18} className="arrow" /></Link></Magnetic>
             ) : (
               <>
-                <Magnetic><Link to="/register" className="btn btn-white btn-lg">Create student account <ArrowRight size={18} className="arrow" /></Link></Magnetic>
-                <Magnetic><Link to="/login" className="btn btn-ghost btn-lg">Staff log in</Link></Magnetic>
+                <Magnetic><Link to="/portal?next=register" className="btn btn-white btn-lg">Create student account <ArrowRight size={18} className="arrow" /></Link></Magnetic>
+                <Magnetic><Link to="/portal" className="btn btn-ghost btn-lg">Log in</Link></Magnetic>
               </>
             )}
           </div>

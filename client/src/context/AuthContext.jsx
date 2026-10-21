@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import api, { clearSession, getToken } from '../api';
+import { rememberPortal } from '../utils/portal';
 
 const AuthContext = createContext(null);
 
@@ -35,6 +36,7 @@ export function AuthProvider({ children }) {
     } catch {
       /* storage blocked – the session lasts until the page is closed */
     }
+    if (u?.university?.slug) rememberPortal(u.university.slug);
     setUser(u);
     return u;
   }, []);
@@ -49,7 +51,9 @@ export function AuthProvider({ children }) {
     setUser(u);
   }, []);
 
-  const login = async (email, password, remember = true) => save((await api.post('/auth/login', { email, password })).data, remember);
+  // university = the portal (e.g. "ruhuna"); empty for the platform admin
+  const login = async (email, password, remember = true, university) =>
+    save((await api.post('/auth/login', { email, password, university: university || undefined })).data, remember);
   // Last step of the verified student registration (see pages/Register.jsx)
   const completeRegistration = async (payload) => save((await api.post('/auth/register/complete', payload)).data);
   const logout = useCallback(() => {
