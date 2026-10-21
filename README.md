@@ -1,6 +1,6 @@
 # ClearPath – University Digital Clearance & No-Dues Management System
 
-EE4207 – Web Application Development · MERN stack (MongoDB, Express, React, Node.js)
+EC4307 – Web Application Development · MERN stack (MongoDB, Express, React, Node.js)
 
 Students submit **one online clearance request**. Every department (Library, Hostel, Finance, Labs, Sports, Student Affairs) reviews it in parallel, records dues when something is owed, verifies uploaded payment receipts, and clears the student. When the last department clears them, a **PDF certificate with a QR code** is issued automatically, and anyone can verify it on a public page.
 
@@ -22,18 +22,32 @@ One platform serves **all 17 Sri Lankan state universities**: a user's universit
 
 ---
 
-## 2. Run it on your computer
+## 2. Screenshots
+
+| | |
+| --- | --- |
+| ![Choose your university](docs/screenshots/02-choose-university.png) **Choose your university** – each university has its own portal | ![University portal](docs/screenshots/03-portal-login.png) **University portal** – log in or create an account |
+| ![Student clearance](docs/screenshots/06-student-clearance.png) **Student** – live tracker for every department | ![Student dues](docs/screenshots/07-student-dues.png) **Student** – dues and receipt upload |
+| ![Officer request drawer](docs/screenshots/10-officer-request-drawer.png) **Officer** – review a request, approve a receipt, add a due | ![Officer dues](docs/screenshots/11-officer-dues.png) **Officer** – dues register (add, edit, settle, sort, export) |
+| ![Admin reports](docs/screenshots/13-admin-reports.png) **Admin** – reports and charts | ![Admin students](docs/screenshots/14-admin-students.png) **Admin** – official student list (search, sort, edit, import) |
+| ![Platform universities](docs/screenshots/15-platform-universities.png) **Platform admin** – universities, portals and admins | ![Verify certificate](docs/screenshots/16-verify-certificate.png) **Public** – QR certificate verification |
+
+More in [`docs/screenshots`](docs/screenshots), including a phone layout and dark mode.
+
+---
+
+## 3. Run it on your computer
 
 You need **Node.js 18+** (https://nodejs.org) and a free **MongoDB Atlas** database.
 
-### 2a. MongoDB Atlas (once, ~5 minutes)
+### 3a. MongoDB Atlas (once, ~5 minutes)
 1. Sign up at https://www.mongodb.com/cloud/atlas/register and create a free **M0** cluster (AWS, Mumbai is closest).
 2. Create a database user (letters and numbers only in the password).
 3. **Network Access → Add IP Address → Allow access from anywhere** (`0.0.0.0/0`).
 4. **Connect → Drivers → Node.js** → copy the connection string and add `clearpath` after `.net/`:
    `mongodb+srv://USER:PASSWORD@cluster0.xxxxx.mongodb.net/clearpath?retryWrites=true&w=majority`
 
-### 2b. Backend (terminal 1)
+### 3b. Backend (terminal 1)
 ```bash
 cd server
 npm install
@@ -45,7 +59,7 @@ npm run seed     # resets the database: 17 universities + realistic demo data
 npm run dev      # API on http://localhost:5000  → "MongoDB connected"
 ```
 
-### 2c. Frontend (terminal 2)
+### 3c. Frontend (terminal 2)
 ```bash
 cd client
 npm install
@@ -53,7 +67,7 @@ npm run dev      # opens http://localhost:5173
 ```
 `client/.env` should contain `VITE_API_URL=http://localhost:5000`.
 
-### 2d. Demo accounts (password for all: `password123`)
+### 3d. Demo accounts (password for all: `password123`)
 **Signing in:** press **Log in** → choose the university (each university has its own portal, e.g. `/portal/ruhuna`) → log in or create an account there. The platform admin uses **Platform administrator sign-in** at the bottom of the university list (`/platform-login`). Each university has its own admin, created by the platform admin under **Universities**.
 
 | Who | Email | What you'll see |
@@ -73,7 +87,7 @@ npm run dev      # opens http://localhost:5173
 
 ---
 
-## 3. Deploy it online (free) – one service on Render
+## 4. Deploy it online (free) – one service on Render
 
 The Express server also serves the built React app, so the whole system is **one web service with one URL** (no CORS setup, the QR codes point to the right address automatically).
 
@@ -127,7 +141,7 @@ Deploy `server` as a Render web service (root directory `server`, start `npm sta
 
 ---
 
-## 4. Demonstration script (about 10 minutes)
+## 5. Demonstration script (about 10 minutes)
 
 1. **Home page** – the problem (paper form, six offices) and the solution. Show the university email → portal idea.
 2. **Kasun (student)** – Overview shows 3 of 6 cleared and exactly what to do next. Open **Dues & payments** and upload any image/PDF as the receipt for the LKR 450 library fine.
@@ -142,7 +156,7 @@ Deploy `server` as a Render web service (root directory `server`, start `npm sta
 
 ---
 
-## 5. Project structure
+## 6. Project structure
 ```
 clearpath/
 ├── package.json            root scripts: build (installs + builds the app), start, seed
@@ -158,33 +172,140 @@ clearpath/
 │   ├── utils/              helpers (audit, notify, certificates), files, mailer, university policy
 │   ├── data/universities.js the 17 state universities and their email domains
 │   └── seed.js             realistic demo data
+├── docs/screenshots/       screenshots used in this README
 └── client/                 React 18 + Vite single-page app
     └── src/
         ├── App.jsx         routes (public pages + signed-in area), lazy loading
         ├── api.js          axios instance (JWT, session expiry)
         ├── context/        auth, theme, dialogs
-        ├── hooks/useFetch  data loading with loading/error states
+        ├── hooks/          useFetch (loading/error states), useSort (sortable tables)
         ├── components/     app shell (sidebar, top bar, bell), UI kit, charts, error boundary
         └── pages/          public pages, student/, officer/, admin/, platform/, account/
 ```
 
-## 6. REST API (all under `/api`)
+## 7. Database design (ERD)
+
+Every record belongs to one university (`university` reference), so each university only sees its own data. A clearance request embeds one item per department; dues live in their own collection because they have their own life cycle and receipts.
+
+```mermaid
+erDiagram
+    UNIVERSITY ||--o{ DEPARTMENT : has
+    UNIVERSITY ||--o{ USER : has
+    UNIVERSITY ||--o{ ENROLLED_STUDENT : "official list"
+    ENROLLED_STUDENT |o--o| USER : "activates"
+    DEPARTMENT ||--o{ USER : "officers"
+    USER ||--o{ CLEARANCE_REQUEST : submits
+    USER ||--o{ DUE : owes
+    DEPARTMENT ||--o{ DUE : records
+    CLEARANCE_REQUEST ||--|{ CLEARANCE_ITEM : "items[] (one per department)"
+    DEPARTMENT ||--o{ CLEARANCE_ITEM : reviews
+    CLEARANCE_REQUEST ||--o| CERTIFICATE : "issued when all cleared"
+    USER ||--o{ NOTIFICATION : receives
+    USER ||--o{ AUDIT_LOG : "actor"
+    USER ||--o{ STORED_FILE : uploads
+
+    UNIVERSITY {
+        ObjectId _id PK
+        string name UK
+        string code UK
+        string slug UK
+        string[] domains
+        string logoUrl
+        bool isActive
+    }
+    DEPARTMENT {
+        ObjectId _id PK
+        ObjectId university FK
+        string name
+        string code
+        number order
+        bool isActive
+    }
+    USER {
+        ObjectId _id PK
+        string email UK
+        string password "bcrypt hash"
+        string role "student|officer|admin|superadmin"
+        ObjectId university FK
+        ObjectId department FK
+        string regNo
+        string faculty
+    }
+    ENROLLED_STUDENT {
+        ObjectId _id PK
+        ObjectId university FK
+        string regNo
+        string email
+        string status "pending|activated"
+        ObjectId user FK
+    }
+    DUE {
+        ObjectId _id PK
+        ObjectId student FK
+        ObjectId department FK
+        number amount
+        string description
+        string status "unpaid|receipt-submitted|paid|waived"
+        string receiptUrl
+    }
+    CLEARANCE_REQUEST {
+        ObjectId _id PK
+        ObjectId student FK
+        string reason
+        string note
+        string status "pending|in-progress|completed|cancelled"
+    }
+    CLEARANCE_ITEM {
+        ObjectId department FK
+        string status "pending|cleared|dues"
+        string remark
+        ObjectId actionedBy FK
+    }
+    CERTIFICATE {
+        ObjectId _id PK
+        ObjectId request FK
+        string certificateNo UK
+        date issuedAt
+    }
+    NOTIFICATION {
+        ObjectId _id PK
+        ObjectId user FK
+        string title
+        bool read
+    }
+    AUDIT_LOG {
+        ObjectId _id PK
+        ObjectId actor FK
+        string action
+        string details
+    }
+    STORED_FILE {
+        ObjectId _id PK
+        string key UK
+        string contentType
+        binary data
+    }
+```
+
+Unique rules: department `(university, code)` and `(university, name)`; student list `(university, regNo)`; user `email` and `(university, regNo)`. Indexes back the busiest queries (officer queue on `items.department + items.status`, dues by student/department, notifications by user).
+
+## 8. REST API (all under `/api`)
 | Area | Endpoints |
 | --- | --- |
 | Auth | `POST /auth/register/start · /register/verify · /register/complete · /login · /forgot-password`, `GET/POST /auth/reset-password/:token`, `GET/PATCH /auth/me`, `PATCH /auth/password` |
-| Clearance | `POST /clearances`, `GET /clearances/my`, `PATCH /clearances/:id/cancel`, `GET /clearances/department`, `PATCH /clearances/:id/items/:deptId` |
-| Dues | `GET /dues/my`, `POST /dues/:id/receipt`, `GET /dues/department`, `GET /dues/lookup`, `POST /dues`, `PATCH /dues/:id/verify`, `DELETE /dues/:id` |
+| Clearance | `POST /clearances`, `GET /clearances/my`, `PATCH /clearances/:id` (edit), `PATCH /clearances/:id/cancel`, `GET /clearances/department`, `PATCH /clearances/:id/items/:deptId` |
+| Dues | `GET /dues/my`, `POST /dues/:id/receipt`, `GET /dues/department`, `GET /dues/lookup`, `POST /dues`, `PATCH /dues/:id` (edit), `PATCH /dues/:id/verify`, `DELETE /dues/:id` |
 | Certificates | `GET /certificates/:requestId/pdf`, `GET /verify/:no` (public), `GET /verify/:no/qr.png` (public) |
 | Dashboards | `GET /stats/badges`, `GET /stats/officer`, `GET /stats/officer/activity` |
 | Notifications | `GET /notifications`, `PATCH /notifications/read-all`, `PATCH /notifications/:id/read`, `DELETE /notifications` |
-| Admin | `GET/POST/PATCH/DELETE /admin/users`, `GET /admin/users/:id/summary`, `GET /admin/requests`, `GET /admin/requests/:id`, `GET /admin/reports`, `GET /admin/audit`, roster `GET/POST /admin/roster`, `POST /admin/roster/import`, `DELETE /admin/roster/:id`, departments `GET/POST/PATCH/DELETE /departments` |
+| Admin | `GET/POST/PATCH/DELETE /admin/users`, `GET /admin/users/:id/summary`, `GET /admin/requests`, `GET /admin/requests/:id`, `GET /admin/reports`, `GET /admin/audit`, roster `GET/POST /admin/roster`, `POST /admin/roster/import`, `PATCH/DELETE /admin/roster/:id`, departments `GET/POST/PATCH/DELETE /departments` |
 | Platform | `GET /platform/overview`, `GET /platform/audit`, `GET/POST/PATCH /platform/universities`, logos, admins |
 | Public | `GET /universities`, `GET /universities/lookup?email=`, `GET /files/:key`, `GET /health` |
 
-## 7. Design system
+## 9. Design system
 60-30-10 colour rule: 60% neutral surfaces, 30% ink, 10% one brand colour (indigo `#4f46e5`) for primary actions, links, focus and active states. Green, amber and red only ever mean cleared/paid, dues and unpaid/error. System fonts (San Francisco / Segoe UI / Roboto). Light and dark themes. All tokens are CSS variables in `client/src/styles.css`; the app shell lives in `client/src/app.css`.
 
-## 8. Troubleshooting
+## 10. Troubleshooting
 | Problem | Fix |
 | --- | --- |
 | `MongoDB connection error` / `bad auth` | Check `MONGO_URI` and the password, and that Atlas Network Access allows `0.0.0.0/0`. |
