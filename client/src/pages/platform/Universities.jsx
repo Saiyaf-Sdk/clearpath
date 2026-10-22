@@ -103,7 +103,7 @@ export default function PlatformUniversities() {
         {shown.length === 0 ? <Empty icon={Building2} title="No universities match" /> : (
           <div className="table-wrap">
             <table>
-              <thead><tr><th>University</th><th>Portal</th><th className="hide-sm">Email domains</th><th>University admin</th><th className="hide-sm">Students</th><th>Status</th><th /></tr></thead>
+              <thead><tr><th>University</th><th>Portal</th><th className="hide-sm">Email domains</th><th>University admin</th><th className="hide-sm">Faculties</th><th className="hide-sm">Students</th><th>Status</th><th /></tr></thead>
               <tbody>
                 {shown.map((u) => (
                   <tr key={u._id} style={{ cursor: 'pointer' }} onClick={() => setSelected(u._id)}>
@@ -116,6 +116,7 @@ export default function PlatformUniversities() {
                     <td className="small"><a href={`/portal/${u.slug || u.code.toLowerCase()}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>/portal/{u.slug || u.code.toLowerCase()}</a></td>
                     <td className="small hide-sm">{u.domains.map((d) => `@${d}`).join(', ')}</td>
                     <td>{u.stats.admins > 0 ? <span className="badge badge-active">{u.stats.admins} admin{u.stats.admins > 1 ? 's' : ''}</span> : <span className="badge badge-dues">No admin yet</span>}</td>
+                    <td className="hide-sm">{u.stats.faculties}<div className="muted small">{u.stats.facultyAdmins} faculty admins</div></td>
                     <td className="hide-sm">{u.stats.students}<div className="muted small">{u.stats.onList} on list</div></td>
                     <td><Badge status={u.isActive ? 'active' : 'inactive'} /></td>
                     <td onClick={(e) => e.stopPropagation()}>

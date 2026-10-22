@@ -37,11 +37,11 @@ export default function ResetPassword() {
   const [busy, setBusy] = useState(false);
   const [portal, setPortal] = useState(null);
   // Back to the right university portal (or the chooser / platform page)
-  const loginHere = portal ? `/portal/${portal.slug}` : loginPath();
+  const loginHere = portal ? `/portal/${portal.slug}${portal.faculty ? `/${portal.faculty}` : ''}` : loginPath();
 
   useEffect(() => {
     api.get(`/auth/reset-password/${token}`)
-      .then(({ data }) => { setEmail(data.email); setPortal(data.university); setStatus('ready'); })
+      .then(({ data }) => { setEmail(data.email); setPortal(data.university ? { ...data.university, faculty: data.faculty?.slug } : null); setStatus('ready'); })
       .catch(() => setStatus('invalid'));
   }, [token]);
 

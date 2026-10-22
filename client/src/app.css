@@ -443,3 +443,48 @@ span.uni-logo { flex: none; }
 .avatar-edit-badge { position: absolute; right: -2px; bottom: -2px; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--brand); color: #fff; border: 3px solid var(--surface); transition: transform 0.15s; }
 .avatar-edit:hover .avatar-edit-badge { transform: scale(1.08); }
 .avatar-actions { display: flex; gap: 6px; }
+
+/* ---------- faculty chooser ---------- */
+.choose-uni { display: inline-flex; align-items: center; gap: 12px; margin-bottom: 14px; text-align: left; }
+.choose-uni .eyebrow { margin-bottom: 2px; }
+.choose-uni strong { display: block; font-size: 1rem; }
+.fac-badge {
+  width: 46px; height: 46px; border-radius: 12px; flex: none; display: grid; place-items: center;
+  background: var(--brand-soft); color: var(--brand-ink); border: 1px solid var(--brand-soft-2);
+  font-weight: 800; font-size: 0.72rem; letter-spacing: 0.03em;
+}
+.choose-last .fac-badge { width: 36px; height: 36px; font-size: 0.66rem; }
+.fac-badge.central { background: var(--brand); color: #fff; border-color: transparent; }
+.fac-card .uc-text small { display: block; }
+.central-card {
+  display: flex; align-items: center; gap: 14px; width: 100%; max-width: 760px; margin: 18px auto 0; padding: 16px 18px;
+  border-radius: 16px; border: 1px dashed var(--brand-soft-2); background: var(--surface-glass); backdrop-filter: blur(10px);
+  font: inherit; color: var(--text); text-align: left; cursor: pointer; transition: transform 0.15s, box-shadow 0.2s, border-color 0.2s;
+}
+.central-card:hover { transform: translateY(-1px); box-shadow: var(--shadow); border-color: var(--brand); }
+.central-card .uc-text { flex: 1; min-width: 0; }
+.central-card .uc-text strong { display: block; }
+.central-card .uc-text small { color: var(--muted); }
+.portal-where { display: flex; align-items: center; gap: 6px; color: var(--muted); font-weight: 600; margin: -4px 0 12px; }
+
+/* ---------- faculties page ---------- */
+.fac-list { display: grid; gap: 10px; }
+.fac-row { display: grid; grid-template-columns: auto 1fr minmax(180px, 260px) auto; gap: 16px; align-items: center; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.fac-row.inactive { opacity: 0.6; }
+.fac-main { min-width: 0; display: grid; gap: 4px; }
+.fac-title { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.fac-meta, .fac-stats { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+.fac-meta svg, .fac-stats svg { vertical-align: -2px; }
+.fac-stats { color: var(--text-2); }
+.fac-admins { display: grid; gap: 6px; min-width: 0; }
+.fac-admin { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.fac-admin > span:last-child { min-width: 0; }
+.fac-admin strong, .fac-admin small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.8rem; }
+.fac-admin small { color: var(--muted); font-size: 0.72rem; }
+.admin-list { display: grid; gap: 8px; }
+.admin-row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; }
+.admin-row strong, .admin-row small { display: block; }
+@media (max-width: 1100px) { .fac-row { grid-template-columns: auto 1fr; } .fac-admins, .fac-row .actions { grid-column: 2; } .fac-row .actions { justify-content: flex-start; } }
+.central-tag { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--brand-ink); }
+.office-tag { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: 0.68rem; font-weight: 600; vertical-align: 2px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
+.office-tag.fac { background: var(--brand-soft); color: var(--brand-ink); border-color: var(--brand-soft-2); }

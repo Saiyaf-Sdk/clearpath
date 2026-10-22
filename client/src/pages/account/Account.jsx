@@ -9,7 +9,7 @@ import AvatarPicker from '../../components/AvatarPicker';
 import LogoPanel from '../../components/LogoPanel';
 import { Field, PageHeader, PasswordStrength, Spin, UniLogo } from '../../components/ui';
 
-const ROLE_LABEL = { student: 'Student', officer: 'Department officer', admin: 'University admin', superadmin: 'Platform admin' };
+const ROLE_LABEL = { student: 'Student', officer: 'Office officer', facultyadmin: 'Faculty admin', admin: 'University admin', superadmin: 'Platform admin' };
 
 export default function Account() {
   const { user, logout, updateUser } = useAuth();
@@ -73,6 +73,9 @@ export default function Account() {
               <UniLogo university={user.university} size={30} />
               <span className="small">{user.university.name}</span>
             </div>
+          )}
+          {user.university && (
+            <p className="muted small" style={{ marginTop: 6 }}>{user.facultyInfo ? `${user.facultyInfo.name}${user.facultyInfo.location ? ` · ${user.facultyInfo.location}` : ''}` : 'Central administration'}</p>
           )}
           <dl className="kv" style={{ textAlign: 'left' }}>
             {user.role === 'student' && (<><dt>Reg. number</dt><dd>{user.regNo}</dd><dt>Faculty</dt><dd>{user.faculty}</dd></>)}

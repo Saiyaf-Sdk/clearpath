@@ -4,12 +4,15 @@ import toast from 'react-hot-toast';
 import { ClipboardList, Download, FileText } from 'lucide-react';
 import api, { errMsg, fileUrl } from '../../api';
 import { useDialog } from '../../context/DialogContext';
+import { useAuth } from '../../context/AuthContext';
 import { useShell } from '../../components/app/ShellContext';
 import useFetch from '../../hooks/useFetch';
 import useSort from '../../hooks/useSort';
 import {
   ActivityList, Badge, cap, downloadCsv, Drawer, Empty, ErrorState, fmtDate, fmtDateTime, lkr, MiniProgress, PageHeader, PageSkeleton, Person, SearchInput, Skeleton, Spin,
 } from '../../components/ui';
+import FacultySelect, { facultyShort } from '../../components/FacultySelect';
+
 
 const STATUSES = [
   { value: '', label: 'All statuses' },
@@ -21,14 +24,17 @@ const STATUSES = [
 
 export default function AdminRequests() {
   const { prompt } = useDialog();
+  const { user: me } = useAuth();
   const { refresh: refreshBadges } = useShell();
   const [params, setParams] = useSearchParams();
   const status = params.get('status') || '';
   const search = params.get('q') || '';
   const department = params.get('department') || '';
+  const faculty = params.get('faculty') || '';
+  const isUniAdmin = me?.role === 'admin';
   const openId = params.get('open');
   const depts = useFetch('/departments');
-  const list = useFetch('/admin/requests', { params: { status: status || undefined, search: search || undefined, department: department || undefined, deptStatus: department ? 'pending' : undefined } });
+  const list = useFetch('/admin/requests', { params: { status: status || undefined, search: search || undefined, faculty: faculty || undefined, department: department || undefined, deptStatus: department ? 'pending' : undefined } });
   const detail = useFetch(openId ? `/admin/requests/${openId}` : null, { enabled: !!openId });
   const [working, setWorking] = useState('');
   const [downloading, setDownloading] = useState(false);
@@ -101,7 +107,7 @@ export default function AdminRequests() {
     <div className="page">
       <PageHeader
         title="All requests"
-        subtitle="Every clearance request in your university. Click a row for the full history."
+        subtitle={isUniAdmin ? 'Every clearance request in your university. Click a row for the full history.' : `Every clearance request from the ${me?.facultyInfo?.name || 'faculty'}. Click a row for the full history.`}
         actions={<button className="btn btn-ghost" onClick={exportCsv} disabled={!list.data?.length}><Download size={16} /> Export CSV</button>}
       />
 
@@ -111,20 +117,23 @@ export default function AdminRequests() {
           <select className="input select-sm" value={status} onChange={(e) => setParam('status', e.target.value)} aria-label="Status">
             {STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
-          <select className="input select-sm" value={department} onChange={(e) => setParam('department', e.target.value)} aria-label="Pending at department">
-            <option value="">Any department</option>
-            {(depts.data || []).map((dp) => <option key={dp._id} value={dp._id}>Pending at {dp.name}</option>)}
+          {isUniAdmin && <FacultySelect all value={faculty} onChange={(v) => setParam('faculty', v)} className="input select-sm" />}
+          <select className="input select-sm" value={department} onChange={(e) => setParam('department', e.target.value)} aria-label="Pending at office">
+            <option value="">Any office</option>
+            {(depts.data || []).filter((dp) => !faculty || !dp.faculty || String(dp.faculty._id) === faculty).map((dp) => (
+              <option key={dp._id} value={dp._id}>Pending at {dp.name}{dp.faculty ? ` (${dp.faculty.code})` : ''}</option>
+            ))}
           </select>
           {list.data && <span className="muted small push-right">{list.data.length} request{list.data.length !== 1 ? 's' : ''}</span>}
         </div>
         {!list.data ? <PageSkeleton /> : list.data.length === 0 ? <Empty icon={ClipboardList} title="No requests">Nothing matches these filters.</Empty> : (
           <div className="table-wrap">
             <table className="table-click">
-              <thead><tr>{th('student', 'Student')}{th('reason', 'Reason', { className: 'hide-sm' })}{th('createdAt', 'Submitted', { className: 'hide-sm' })}<th>Departments</th>{th('progress', 'Progress', { className: 'hide-md' })}{th('status', 'Status')}</tr></thead>
+              <thead><tr>{th('student', 'Student')}{th('reason', 'Reason', { className: 'hide-sm' })}{th('createdAt', 'Submitted', { className: 'hide-sm' })}<th>Offices</th>{th('progress', 'Progress', { className: 'hide-md' })}{th('status', 'Status')}</tr></thead>
               <tbody>
                 {sorted.map((r) => (
                   <tr key={r._id} onClick={() => setParam('open', r._id)} className={openId === r._id ? 'row-active' : ''}>
-                    <td><Person name={r.student?.name} photo={r.student?.avatarUrl} sub={`${r.student?.regNo} · ${r.student?.faculty}`} /></td>
+                    <td><Person name={r.student?.name} photo={r.student?.avatarUrl} sub={`${r.student?.regNo} · ${r.faculty ? r.faculty.code : facultyShort(r.student?.faculty || '')}`} /></td>
                     <td className="hide-sm">{cap(r.reason)}</td>
                     <td className="hide-sm">{fmtDate(r.createdAt)}</td>
                     <td onClick={(e) => e.stopPropagation()}>

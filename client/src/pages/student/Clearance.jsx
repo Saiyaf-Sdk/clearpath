@@ -175,6 +175,7 @@ export default function StudentClearance() {
                   <div className="tl-content">
                     <div>
                       <strong>{it.department?.name}</strong>
+                      <span className={`office-tag ${it.department?.faculty ? 'fac' : ''}`}>{it.department?.faculty ? 'Faculty office' : 'Central office'}</span>
                       <p>{it.remark || (it.status === 'pending' ? 'Waiting for review' : '')}</p>
                       {it.actionedAt && (
                         <small className="muted">

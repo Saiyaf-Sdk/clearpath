@@ -1,4 +1,4 @@
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useParams } from 'react-router-dom';
 import { loginPath, registerPath } from '../../utils/portal';
 
 // Old addresses (/login, /register) and "please log in" redirects go to the right university portal,
@@ -10,4 +10,10 @@ export function LoginRedirect() {
 
 export function RegisterRedirect() {
   return <Navigate to={registerPath()} replace />;
+}
+
+// /portal/<university>/register (older links): choose the faculty first, then create the account there
+export function FacultyRegisterRedirect() {
+  const { slug } = useParams();
+  return <Navigate to={`/portal/${slug}?next=register`} replace />;
 }

@@ -1,13 +1,19 @@
+import { useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Download, Printer } from 'lucide-react';
 import useFetch from '../../hooks/useFetch';
 import { C, ChartTip, useChartTheme } from '../../components/charts';
+import FacultySelect from '../../components/FacultySelect';
+import { useAuth } from '../../context/AuthContext';
 import { cap, downloadCsv, ErrorState, lkr, PageHeader, PageSkeleton } from '../../components/ui';
 
 const REASON_COLORS = [C.brand, C.brandSoft, C.grey, C.greySoft];
 
 export default function AdminReports() {
-  const { data, error, reload } = useFetch('/admin/reports');
+  const { user } = useAuth();
+  const isUniAdmin = user.role === 'admin';
+  const [faculty, setFaculty] = useState('');
+  const { data, error, reload } = useFetch('/admin/reports', { params: { faculty: faculty || undefined } });
   const ct = useChartTheme();
 
   if (error) return <ErrorState message={error} onRetry={reload} />;
@@ -36,9 +42,10 @@ export default function AdminReports() {
     <div className="page">
       <PageHeader
         title="Reports"
-        subtitle="Clearance performance across faculties and departments."
+        subtitle={isUniAdmin ? 'Clearance performance across faculties and offices.' : `Clearance performance of the ${user.facultyInfo?.name || 'faculty'}.`}
         actions={
           <>
+            {isUniAdmin && <FacultySelect all value={faculty} onChange={setFaculty} className="input select-sm" />}
             <button className="btn btn-ghost" onClick={() => window.print()}><Printer size={16} /> Print</button>
             <button className="btn btn-primary" onClick={exportAll}><Download size={16} /> Export CSV</button>
           </>

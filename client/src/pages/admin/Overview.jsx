@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -8,13 +9,16 @@ import { useAuth } from '../../context/AuthContext';
 import useFetch from '../../hooks/useFetch';
 import { item, stagger } from '../../components/Page';
 import { C, ChartTip, useChartTheme } from '../../components/charts';
+import FacultySelect from '../../components/FacultySelect';
 import { Badge, cap, Empty, ErrorState, fmtDate, lkr, PageHeader, PageSkeleton, Person, shortDay, StatCard } from '../../components/ui';
 
 export const STATUS_COLORS = { pending: C.grey, 'in-progress': C.brand, completed: C.good, cancelled: C.greySoft };
 
 export default function AdminOverview() {
   const { user } = useAuth();
-  const { data, error, reload } = useFetch('/admin/reports');
+  const isUniAdmin = user.role === 'admin';
+  const [faculty, setFaculty] = useState('');
+  const { data, error, reload } = useFetch('/admin/reports', { params: { faculty: faculty || undefined } });
   const ct = useChartTheme();
 
   if (error) return <ErrorState message={error} onRetry={reload} />;
@@ -28,10 +32,15 @@ export default function AdminOverview() {
   return (
     <div className="page">
       <PageHeader
-        title={user.university?.name || 'University'}
-        eyebrow="Admin console"
-        subtitle="Where every student's clearance stands, and where they are waiting."
-        actions={<Link to="/admin/reports" className="btn btn-ghost">Full reports <ArrowRight size={16} /></Link>}
+        title={isUniAdmin ? user.university?.name || 'University' : user.facultyInfo?.name || 'Faculty'}
+        eyebrow={isUniAdmin ? 'University admin console' : `Faculty admin · ${user.university?.shortName || ''}`}
+        subtitle={isUniAdmin ? "Where every student's clearance stands, and where they are waiting." : "Where your faculty's students stand, across your faculty offices and the central offices."}
+        actions={
+          <>
+            {isUniAdmin && <FacultySelect all value={faculty} onChange={setFaculty} className="input select-sm" />}
+            <Link to="/admin/reports" className="btn btn-ghost">Full reports <ArrowRight size={16} /></Link>
+          </>
+        }
       />
 
       <motion.div className="stats stats-5" variants={stagger} initial="hidden" animate="show">

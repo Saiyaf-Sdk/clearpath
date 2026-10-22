@@ -1,4 +1,5 @@
-// Remembers the university portal this browser used last, so returning users go straight to it.
+// Remembers the portal this browser used last (university, and the faculty when known),
+// e.g. "ruhuna/engineering" or "ruhuna/central", so returning users go straight to it.
 const KEY = 'cp_portal';
 
 export const rememberedPortal = () => {
@@ -9,9 +10,9 @@ export const rememberedPortal = () => {
   }
 };
 
-export const rememberPortal = (slug) => {
+export const rememberPortal = (university, faculty) => {
   try {
-    if (slug) localStorage.setItem(KEY, slug);
+    if (university) localStorage.setItem(KEY, faculty ? `${university}/${faculty}` : university);
   } catch {
     /* storage blocked */
   }
@@ -25,9 +26,19 @@ export const forgetPortal = () => {
   }
 };
 
+const parts = () => rememberedPortal().split('/').filter(Boolean);
+export const rememberedUniversity = () => parts()[0] || '';
+export const rememberedFaculty = () => parts()[1] || '';
+
 // Where "Log in" / "Create account" should go
 export const loginPath = () => (rememberedPortal() ? `/portal/${rememberedPortal()}` : '/portal');
-export const registerPath = () => (rememberedPortal() ? `/portal/${rememberedPortal()}/register` : '/portal?next=register');
+export const registerPath = () => {
+  const [uni, fac] = parts();
+  if (uni && fac && fac !== 'central') return `/portal/${uni}/${fac}/register`;
+  return uni ? `/portal/${uni}?next=register` : '/portal?next=register';
+};
+// Address of a faculty portal (faculty slug "central" = Central administration)
+export const facultyPath = (uni, fac, register = false) => `/portal/${uni}/${fac}${register ? '/register' : ''}`;
 
 // Does this email belong to the university? (sub-domains count: stu.ruh.ac.lk → ruh.ac.lk)
 export const emailMatches = (email, university) => {

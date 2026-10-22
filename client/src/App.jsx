@@ -8,11 +8,12 @@ import RequireAuth, { RoleGate } from './components/ProtectedRoute';
 import PublicLayout from './components/PublicLayout';
 import AppShell from './components/app/AppShell';
 import Landing from './pages/Landing';
-import { LoginRedirect, RegisterRedirect } from './pages/portal/Redirects';
+import { FacultyRegisterRedirect, LoginRedirect, RegisterRedirect } from './pages/portal/Redirects';
 
 // Pages load on demand, so the first visit only downloads what it needs
 const ChooseUniversity = lazy(() => import('./pages/portal/ChooseUniversity'));
 const PortalAuth = lazy(() => import('./pages/portal/PortalAuth'));
+const ChooseFaculty = lazy(() => import('./pages/portal/ChooseFaculty'));
 const PlatformLogin = lazy(() => import('./pages/portal/PlatformLogin'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
@@ -38,6 +39,7 @@ const AdminStudents = lazy(() => import('./pages/admin/Students'));
 const AdminUsers = lazy(() => import('./pages/admin/Users'));
 const AdminDepartments = lazy(() => import('./pages/admin/Departments'));
 const AdminAudit = lazy(() => import('./pages/admin/Audit'));
+const AdminFaculties = lazy(() => import('./pages/admin/Faculties'));
 
 const PlatformOverview = lazy(() => import('./pages/platform/Overview'));
 const PlatformUniversities = lazy(() => import('./pages/platform/Universities'));
@@ -81,8 +83,10 @@ export default function App() {
           <Route element={<PublicLayout />}>
             <Route index element={<Landing />} />
             <Route path="portal" element={<ChooseUniversity />} />
-            <Route path="portal/:slug" element={<PortalAuth mode="login" />} />
-            <Route path="portal/:slug/register" element={<PortalAuth mode="register" />} />
+            <Route path="portal/:slug" element={<ChooseFaculty />} />
+            <Route path="portal/:slug/register" element={<FacultyRegisterRedirect />} />
+            <Route path="portal/:slug/:faculty" element={<PortalAuth mode="login" />} />
+            <Route path="portal/:slug/:faculty/register" element={<PortalAuth mode="register" />} />
             <Route path="platform-login" element={<PlatformLogin />} />
             <Route path="login" element={<LoginRedirect />} />
             <Route path="register" element={<RegisterRedirect />} />
@@ -109,8 +113,9 @@ export default function App() {
               <Route path="dues" element={<OfficerDues />} />
               <Route path="activity" element={<OfficerActivity />} />
             </Route>
-            <Route path="admin" element={<RoleGate role="admin" />}>
+            <Route path="admin" element={<RoleGate roles={['admin', 'facultyadmin']} />}>
               <Route index element={<AdminOverview />} />
+              <Route path="faculties" element={<AdminFaculties />} />
               <Route path="requests" element={<AdminRequests />} />
               <Route path="reports" element={<AdminReports />} />
               <Route path="students" element={<AdminStudents />} />

@@ -3,7 +3,7 @@ import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-route
 import { AnimatePresence, motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
-  ArrowLeft, ArrowRight, Check, ChevronDown, CircleAlert, ClipboardCheck, Eye, EyeOff, FlaskConical, Hash, Info, Lock, Mail, Phone, QrCode,
+  ArrowLeft, ArrowRight, Check, ChevronDown, CircleAlert, ClipboardCheck, Eye, EyeOff, FlaskConical, Hash, Info, Landmark, Lock, Mail, MapPin, Phone, QrCode,
   Repeat, ShieldCheck, UserCheck,
 } from 'lucide-react';
 import api, { errMsg } from '../../api';
@@ -12,54 +12,65 @@ import useFetch from '../../hooks/useFetch';
 import { Field, PasswordStrength, Skeleton, Spin, UniLogo } from '../../components/ui';
 import { FormError } from '../../components/AuthLayout';
 import CodeInput from '../../components/CodeInput';
-import { emailMatches, rememberPortal } from '../../utils/portal';
+import { emailMatches, facultyPath, rememberPortal } from '../../utils/portal';
 
 const EASE = [0.22, 1, 0.36, 1];
 // Portal details already loaded in this visit (switching between Log in / Create account is instant)
 const portalCache = {};
 
-// Demo accounts are only offered while developing, or when VITE_SHOW_DEMO=true is set (project evaluation)
+// Demo accounts are only offered while developing, or when VITE_SHOW_DEMO=true is set (project evaluation).
+// They follow the seed script's pattern: central offices demo.lib@…, faculty staff demo.<code>.office@… and so on.
 const SHOW_DEMO = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEMO === 'true';
-const DEMO = {
-  ruhuna: [
-    ['Student · in progress', 'demo.kasun@ruh.ac.lk'],
-    ['Student · certificate ready', 'demo.nimali@ruh.ac.lk'],
-    ['Student · no request yet', 'demo.tharindu@ruh.ac.lk'],
-    ['Library officer', 'demo.lib@ruh.ac.lk'],
-    ['Finance officer', 'demo.fin@ruh.ac.lk'],
-    ['University admin', 'demo.admin@ruh.ac.lk'],
-  ],
-  colombo: [
-    ['Student', 'demo.saman@cmb.ac.lk'],
-    ['Library officer', 'demo.lib@cmb.ac.lk'],
-    ['University admin', 'demo.admin@cmb.ac.lk'],
-  ],
+const LAB_FACULTY = /engineering|science|medic|agri|technolog|dental|veterinary|computing|health|siddha|architecture|livestock|animal|geomatics|nursing|bioresources|fisheries|information/i;
+const DEMO_STUDENTS = {
+  'ruhuna/engineering': [['Student · in progress', 'demo.kasun'], ['Student · certificate ready', 'demo.nimali'], ['Student · no request yet', 'demo.tharindu']],
+  'ruhuna/science': [['Student · in progress', 'demo.hiruni']],
+  'colombo/science': [['Student · in progress', 'demo.saman']],
+};
+const REMOTE_LIBRARY = ['ruhuna/engineering', 'ruhuna/medicine', 'ruhuna/agriculture', 'ruhuna/allied-health-sciences', 'ruhuna/technology'];
+const demoAccounts = (uni, fac) => {
+  const d = uni.domains[0];
+  if (fac.central) {
+    return [['University admin', 'demo.admin'], ['Main library', 'demo.lib'], ['Finance (Bursar)', 'demo.fin'], ['Student affairs', 'demo.saf'], ...(uni.slug === 'colombo' ? [] : [['Hostels', 'demo.hos']]), ['Sports', 'demo.spo']].map(([l, e]) => [l, `${e}@${d}`]);
+  }
+  const key = `${uni.slug}/${fac.slug}`;
+  const c = fac.code.toLowerCase();
+  const staff = [['Faculty admin', 'admin'], ['Faculty office', 'office'], ['Head of Department', 'hod']];
+  if (LAB_FACULTY.test(fac.name) && !/graduate/i.test(fac.name)) staff.push(['Laboratories', 'lab']);
+  if (REMOTE_LIBRARY.includes(key)) staff.push(['Faculty library', 'flib']);
+  return [...(DEMO_STUDENTS[key] || []).map(([l, e]) => [l, `${e}@${d}`]), ...(/graduate/i.test(fac.name) ? staff.slice(0, 2) : staff).map(([l, k]) => [l, `demo.${c}.${k}@${d}`])];
 };
 
-// One university's portal: its own log-in and create-account pages (/portal/ruhuna, /portal/ruhuna/register)
+// One faculty's portal (or Central administration): log in and create account
+// e.g. /portal/ruhuna/engineering, /portal/ruhuna/engineering/register, /portal/ruhuna/central
 export default function PortalAuth({ mode = 'login' }) {
-  const { slug } = useParams();
+  const { slug, faculty: facSlug } = useParams();
   const { user } = useAuth();
-  const { data, error: loadError } = useFetch(`/universities/${encodeURIComponent(slug)}`);
-  const uni = data || portalCache[slug] || null;
+  const key = `${slug}/${facSlug}`;
+  const { data, error: loadError } = useFetch(`/universities/${encodeURIComponent(slug)}/${encodeURIComponent(facSlug)}`);
+  const uni = data || portalCache[key] || null;
+  const fac = uni?.faculty;
   const error = uni ? null : loadError;
+  const central = !!fac?.central;
 
   useEffect(() => {
     if (data?.slug) {
-      portalCache[slug] = data;
-      rememberPortal(data.slug);
+      portalCache[key] = data;
+      rememberPortal(data.slug, data.faculty?.slug);
     }
-  }, [data, slug]);
+  }, [data, key]);
 
   if (user) return <Navigate to={homeFor(user.role)} replace />;
+  // Students never create accounts on Central administration
+  if (central && mode === 'register') return <Navigate to={`/portal/${slug}?next=register`} replace />;
 
   if (error) {
     return (
       <div className="portal-missing card">
         <CircleAlert size={26} />
-        <h2>University portal not found</h2>
+        <h2>Portal not found</h2>
         <p className="muted">{error}</p>
-        <Link to="/portal" className="btn btn-primary"><ArrowLeft size={16} /> Choose your university</Link>
+        <Link to={`/portal/${slug}`} className="btn btn-primary"><ArrowLeft size={16} /> Choose your faculty</Link>
       </div>
     );
   }
@@ -78,19 +89,24 @@ export default function PortalAuth({ mode = 'login' }) {
             <div className="portal-id">
               <UniLogo university={uni} size={72} />
               <div>
-                <small>ClearPath clearance portal</small>
-                <strong>{uni.code} · {uni.domains[0]}</strong>
+                <small>{uni.name}</small>
+                <strong>{central ? 'Central administration' : `${fac.code} · ${uni.domains[0]}`}</strong>
               </div>
             </div>
-            <h1 className={`auth-headline ${uni.name.length > 34 ? 'long' : ''}`} lang="en">{uni.name}</h1>
+            <h1 className={`auth-headline ${fac.name.length > 34 ? 'long' : ''}`} lang="en">{fac.name}</h1>
+            {fac.location && <p className="portal-where"><MapPin size={15} /> {fac.location}</p>}
             <p className="auth-lead">
-              {mode === 'register'
-                ? `Create your ${uni.shortName} ClearPath account with your registration number and university email.`
-                : `Sign in to your ${uni.shortName} clearance portal – students, department officers and administrators.`}
+              {central
+                ? `For the ${uni.shortName} university admin and the central offices – main library, finance, student affairs, hostels and sports.`
+                : mode === 'register'
+                  ? `Create your ClearPath account for the ${fac.name} with your registration number and university email.`
+                  : `Sign in to the ${fac.name} clearance portal – students, faculty officers and the faculty admin.`}
             </p>
             <ul className="auth-points">
               {[
-                { icon: ClipboardCheck, title: 'One request, every office', text: `All ${uni.shortName} departments review your clearance in parallel.` },
+                central
+                  ? { icon: Landmark, title: 'Central offices clear everyone', text: `Requests from every ${uni.shortName} faculty reach the central offices.` }
+                  : { icon: ClipboardCheck, title: 'One request, every office', text: `Your faculty's offices and the ${uni.shortName} central offices review it in parallel.` },
                 { icon: Mail, title: `${uni.domains.map((d) => '@' + d).join(' / ')} only`, text: 'Accounts use your official university email.' },
                 { icon: QrCode, title: 'QR-verified certificate', text: `Issued in the name of ${uni.name}.` },
               ].map((p, i) => (
@@ -108,24 +124,26 @@ export default function PortalAuth({ mode = 'login' }) {
       <motion.section className="auth-card" initial={{ opacity: 0, y: 24, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.55, ease: EASE, delay: 0.05 }}>
         <div className="portal-card-top">
           {uni ? (
-            <div className="portal-mini"><UniLogo university={uni} size={30} /><span>{uni.shortName}</span></div>
+            <div className="portal-mini"><UniLogo university={uni} size={30} /><span>{central ? 'Central administration' : fac.name.replace(/^Faculty of\s+/i, '')} · {uni.shortName}</span></div>
           ) : <Skeleton h={30} w={180} />}
-          <Link to="/portal" className="auth-link small"><Repeat size={13} style={{ verticalAlign: -2 }} /> Change university</Link>
+          <Link to={`/portal/${slug}${mode === 'register' ? '?next=register' : ''}`} className="auth-link small"><Repeat size={13} style={{ verticalAlign: -2 }} /> Change faculty</Link>
         </div>
 
-        <div className="portal-tabs" role="tablist">
-          <Link role="tab" aria-selected={mode === 'login'} className={mode === 'login' ? 'active' : ''} to={`/portal/${slug}`} replace>Log in</Link>
-          <Link role="tab" aria-selected={mode === 'register'} className={mode === 'register' ? 'active' : ''} to={`/portal/${slug}/register`} replace>Create account</Link>
-        </div>
+        {!central && (
+          <div className="portal-tabs" role="tablist">
+            <Link role="tab" aria-selected={mode === 'login'} className={mode === 'login' ? 'active' : ''} to={facultyPath(slug, facSlug)} replace>Log in</Link>
+            <Link role="tab" aria-selected={mode === 'register'} className={mode === 'register' ? 'active' : ''} to={facultyPath(slug, facSlug, true)} replace>Create account</Link>
+          </div>
+        )}
 
-        {!uni ? <Skeleton h={260} r={14} /> : mode === 'register' ? <RegisterForm uni={uni} /> : <LoginForm uni={uni} />}
+        {!uni ? <Skeleton h={260} r={14} /> : mode === 'register' ? <RegisterForm uni={uni} fac={fac} /> : <LoginForm uni={uni} fac={fac} />}
       </motion.section>
     </div>
   );
 }
 
 /* ---------------- Log in ---------------- */
-function LoginForm({ uni }) {
+function LoginForm({ uni, fac }) {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -138,14 +156,14 @@ function LoginForm({ uni }) {
   const [busy, setBusy] = useState(false);
   const [demoOpen, setDemoOpen] = useState(false);
   const match = emailMatches(form.email, uni);
-  const demo = DEMO[uni.slug] || [];
+  const demo = demoAccounts(uni, fac);
 
   const submit = async (e) => {
     e.preventDefault();
     setError(null);
     setBusy(true);
     try {
-      const u = await login(form.email, form.password, remember, uni.slug);
+      const u = await login(form.email, form.password, remember, uni.slug, fac.slug);
       toast.success(`Welcome back, ${u.name.split(' ')[0]}`);
       navigate(target(u), { replace: true });
     } catch (err) {
@@ -159,7 +177,7 @@ function LoginForm({ uni }) {
     <form className="auth-form-stack" onSubmit={submit}>
       <div className="auth-head">
         <h2>Log in</h2>
-        <p>Use your {uni.shortName} email and password.</p>
+        <p>{fac.central ? `University admin and central office staff of ${uni.shortName}.` : `Use your ${uni.shortName} email and password.`}</p>
       </div>
 
       <AnimatePresence>
@@ -170,6 +188,9 @@ function LoginForm({ uni }) {
               {error.message}
               {error.code === 'WRONG_PORTAL' && error.portal && (
                 <> <Link className="auth-link" to={`/portal/${error.portal.slug}`} replace onClick={() => setError(null)}>Go to {error.portal.shortName} portal →</Link></>
+              )}
+              {['WRONG_FACULTY', 'CHOOSE_FACULTY'].includes(error.code) && error.portal?.faculty && (
+                <> <Link className="auth-link" to={facultyPath(error.portal.slug, error.portal.faculty.slug)} replace onClick={() => setError(null)}>Go to {error.portal.faculty.name} →</Link></>
               )}
               {error.code === 'PLATFORM_LOGIN' && <> <Link className="auth-link" to="/platform-login">Platform sign-in →</Link></>}
             </span>
@@ -202,14 +223,18 @@ function LoginForm({ uni }) {
           <span className="box" aria-hidden="true" />
           Keep me signed in
         </label>
-        <Link to={`/forgot-password?portal=${uni.slug}`} className="auth-link">Forgot password?</Link>
+        <Link to={`/forgot-password?portal=${uni.slug}/${fac.slug}`} className="auth-link">Forgot password?</Link>
       </div>
 
       <button className="btn btn-primary btn-lg btn-block" disabled={busy}>
         {busy ? <><Spin /> Signing in…</> : <>Log in <ArrowRight size={18} className="arrow" /></>}
       </button>
 
-      <p className="auth-note">New student? <Link to={`/portal/${uni.slug}/register`} className="auth-link" replace>Create your account</Link>. Staff accounts are created by your university's administrator.</p>
+      {fac.central ? (
+        <p className="auth-note">Students and faculty staff log in on their own faculty. <Link to={`/portal/${uni.slug}`} className="auth-link">Choose a faculty</Link></p>
+      ) : (
+        <p className="auth-note">New student? <Link to={facultyPath(uni.slug, fac.slug, true)} className="auth-link" replace>Create your account</Link>. Staff accounts are created by your faculty or university admin.</p>
+      )}
 
       {SHOW_DEMO && demo.length > 0 && (
         <div className={`demo-panel ${demoOpen ? 'open' : ''}`}>
@@ -225,7 +250,7 @@ function LoginForm({ uni }) {
                     <button type="button" key={email} className="chip-btn" onClick={() => setForm({ email, password: 'password123' })}>{label}</button>
                   ))}
                 </div>
-                <small className="muted">Fills the form with a seeded {uni.shortName} account (password: password123).</small>
+                <small className="muted">Fills the form with a seeded {fac.central ? uni.shortName : fac.name.replace(/^Faculty of\s+/i, '')} account (password: password123).</small>
               </motion.div>
             )}
           </AnimatePresence>
@@ -238,7 +263,7 @@ function LoginForm({ uni }) {
 /* ---------------- Create account ----------------
    Step 1: registration number, university email, password  → we email a 6-digit code
    Step 2: enter the code                                     → account created and signed in */
-function RegisterForm({ uni }) {
+function RegisterForm({ uni, fac }) {
   const { completeRegistration } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
@@ -271,7 +296,7 @@ function RegisterForm({ uni }) {
     if (!agree) return setError({ message: 'Please confirm these details are yours.' });
     setBusy(true);
     try {
-      const { data } = await api.post('/auth/register/start', { university: uni.slug, regNo: form.regNo, email: form.email });
+      const { data } = await api.post('/auth/register/start', { university: uni.slug, faculty: fac.slug, regNo: form.regNo, email: form.email });
       setSentTo(data.maskedEmail);
       setDevCode(data.devCode || '');
       setCode('');
@@ -290,7 +315,7 @@ function RegisterForm({ uni }) {
     setError(null);
     setBusy(true);
     try {
-      const u = await completeRegistration({ university: uni.slug, regNo: form.regNo, email: form.email, code, password: form.password, phone: form.phone });
+      const u = await completeRegistration({ university: uni.slug, faculty: fac.slug, regNo: form.regNo, email: form.email, code, password: form.password, phone: form.phone });
       toast.success(`Welcome to ClearPath, ${u.name.split(' ')[0]}!`);
       navigate('/student', { replace: true });
     } catch (err) {
@@ -312,7 +337,7 @@ function RegisterForm({ uni }) {
     <form className="auth-form-stack" onSubmit={submit}>
       <div className="auth-head">
         <h2>Create your account</h2>
-        <p>For students on the {uni.shortName} official student list.</p>
+        <p>For {fac.name} students on the {uni.shortName} official student list.</p>
       </div>
 
       <div className="stepper two" aria-label={`Step ${step + 1} of 2`}>
@@ -332,7 +357,10 @@ function RegisterForm({ uni }) {
             <span>
               {error.message}
               {error.code === 'WRONG_PORTAL' && error.portal && (
-                <> <Link className="auth-link" to={`/portal/${error.portal.slug}/register`} replace onClick={() => setError(null)}>Go to {error.portal.shortName} portal →</Link></>
+                <> <Link className="auth-link" to={`/portal/${error.portal.slug}?next=register`} replace onClick={() => setError(null)}>Go to {error.portal.shortName} portal →</Link></>
+              )}
+              {error.code === 'WRONG_FACULTY' && error.portal?.faculty && (
+                <> <Link className="auth-link" to={facultyPath(error.portal.slug, error.portal.faculty.slug, true)} replace onClick={() => setError(null)}>Go to {error.portal.faculty.name} →</Link></>
               )}
             </span>
           </FormError>
@@ -369,12 +397,12 @@ function RegisterForm({ uni }) {
           </label>
           <div className="policy-note">
             <Info size={16} />
-            <span>Your registration number and email must match the {uni.shortName} official student list. Your name and faculty come from university records.</span>
+            <span>Your registration number and email must be on the {uni.shortName} student list under the {fac.name}. Your name comes from university records.</span>
           </div>
           <button className="btn btn-primary btn-lg btn-block" disabled={busy}>
             {busy ? <><Spin /> Checking…</> : <>Send verification code <ArrowRight size={18} className="arrow" /></>}
           </button>
-          <p className="auth-note">Already have an account? <Link to={`/portal/${uni.slug}`} className="auth-link" replace>Log in</Link></p>
+          <p className="auth-note">Already have an account? <Link to={facultyPath(uni.slug, fac.slug)} className="auth-link" replace>Log in</Link></p>
         </motion.div>
       ) : (
         <motion.div key="s1" className="auth-form-stack" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.28, ease: EASE }}>

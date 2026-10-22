@@ -12,7 +12,7 @@ import { ShellProvider, useShell } from './ShellContext';
 import NotificationBell from './NotificationBell';
 import TopoBackground from './TopoBackground';
 
-const ROLE_LABEL = { student: 'Student', officer: 'Department officer', admin: 'University admin', superadmin: 'Platform admin' };
+const ROLE_LABEL = { student: 'Student', officer: 'Office officer', facultyadmin: 'Faculty admin', admin: 'University admin', superadmin: 'Platform admin' };
 
 // The signed-in area: sidebar with every page of your role, top bar, and the page itself.
 // Every page has its own address, so refresh and the browser's back button always work.
@@ -74,7 +74,9 @@ function Sidebar({ open, onClose }) {
   const { user } = useAuth();
   const { badges } = useShell();
   const groups = NAV[user.role] || [];
-  const roleLabel = user.role === 'officer' ? user.department?.name || ROLE_LABEL.officer : ROLE_LABEL[user.role];
+  const baseLabel = user.role === 'officer' ? user.department?.name || ROLE_LABEL.officer : ROLE_LABEL[user.role];
+  // Faculty staff and students: show which faculty (central staff: Central administration)
+  const roleLabel = user.facultyInfo ? `${baseLabel} · ${user.facultyInfo.name.replace(/^Faculty of\s+/i, '')}` : user.role === 'officer' ? `${baseLabel} · Central` : baseLabel;
 
   return (
     <aside className={`sidebar ${open ? 'open' : ''}`} aria-label="Main navigation">

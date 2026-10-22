@@ -5,11 +5,11 @@ import { ArrowRight, Building2, Search, ShieldCheck, X } from 'lucide-react';
 import useFetch from '../../hooks/useFetch';
 import { homeFor, useAuth } from '../../context/AuthContext';
 import { Empty, Skeleton, UniLogo } from '../../components/ui';
-import { rememberedPortal } from '../../utils/portal';
+import { rememberedUniversity, rememberedPortal } from '../../utils/portal';
 
 const EASE = [0.22, 1, 0.36, 1];
 
-// Step 1 of signing in: every university has its own portal, so people choose theirs first.
+// Step 1 of signing in: every university has its own portal, so people choose theirs first (then their faculty).
 export default function ChooseUniversity() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -17,7 +17,7 @@ export default function ChooseUniversity() {
   const next = params.get('next') === 'register' ? 'register' : 'login';
   const { data, error, reload } = useFetch('/universities');
   const [q, setQ] = useState('');
-  const last = rememberedPortal();
+  const last = rememberedUniversity();
 
   const list = useMemo(() => {
     const term = q.toLowerCase().trim();
@@ -27,14 +27,16 @@ export default function ChooseUniversity() {
 
   if (user) return <Navigate to={homeFor(user.role)} replace />;
 
-  const open = (u) => navigate(`/portal/${u.slug}${next === 'register' ? '/register' : ''}`);
+  // Next: choose the faculty (or go straight back to the faculty used last time)
+  const open = (u) => navigate(`/portal/${u.slug}${next === 'register' ? '?next=register' : ''}`);
+  const resume = (u) => navigate(next === 'login' && rememberedPortal().includes('/') ? `/portal/${rememberedPortal()}` : `/portal/${u.slug}${next === 'register' ? '?next=register' : ''}`);
 
   return (
     <div className="choose">
       <motion.div className="choose-head" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }}>
-        <span className="eyebrow"><Building2 size={14} /> Step 1 of 2</span>
+        <span className="eyebrow"><Building2 size={14} /> Step 1 of 3</span>
         <h1>Choose your university</h1>
-        <p className="muted">Each university has its own ClearPath portal. Pick yours to {next === 'register' ? 'create your account' : 'log in'}.</p>
+        <p className="muted">Each university has its own ClearPath portal. Pick yours, then your faculty, to {next === 'register' ? 'create your account' : 'log in'}.</p>
 
         <div className="choose-search">
           <Search size={18} />
@@ -43,7 +45,7 @@ export default function ChooseUniversity() {
         </div>
 
         {lastUni && !q && (
-          <button type="button" className="choose-last" onClick={() => open(lastUni)}>
+          <button type="button" className="choose-last" onClick={() => resume(lastUni)}>
             <UniLogo university={lastUni} size={36} />
             <span><small>Continue where you left off</small><strong>{lastUni.name}</strong></span>
             <ArrowRight size={18} />

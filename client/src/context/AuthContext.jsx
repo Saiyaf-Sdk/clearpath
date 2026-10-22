@@ -36,7 +36,7 @@ export function AuthProvider({ children }) {
     } catch {
       /* storage blocked – the session lasts until the page is closed */
     }
-    if (u?.university?.slug) rememberPortal(u.university.slug);
+    if (u?.university?.slug) rememberPortal(u.university.slug, u.facultyInfo?.slug || 'central');
     setUser(u);
     return u;
   }, []);
@@ -51,9 +51,10 @@ export function AuthProvider({ children }) {
     setUser(u);
   }, []);
 
-  // university = the portal (e.g. "ruhuna"); empty for the platform admin
-  const login = async (email, password, remember = true, university) =>
-    save((await api.post('/auth/login', { email, password, university: university || undefined })).data, remember);
+  // university = the university portal (e.g. "ruhuna"), faculty = the faculty portal (e.g. "engineering" or "central");
+  // both empty for the platform admin
+  const login = async (email, password, remember = true, university, faculty) =>
+    save((await api.post('/auth/login', { email, password, university: university || undefined, faculty: faculty || undefined })).data, remember);
   // Last step of the verified student registration (see pages/Register.jsx)
   const completeRegistration = async (payload) => save((await api.post('/auth/register/complete', payload)).data);
   const logout = useCallback(() => {
@@ -96,7 +97,7 @@ export function AuthProvider({ children }) {
 
 export const useAuth = () => useContext(AuthContext);
 
-export const homeFor = (role) => ({ student: '/student', officer: '/officer', admin: '/admin', superadmin: '/platform' }[role] || '/');
+export const homeFor = (role) => ({ student: '/student', officer: '/officer', admin: '/admin', facultyadmin: '/admin', superadmin: '/platform' }[role] || '/');
 
 // Only send people back to pages that belong to their role after logging in
 export const canVisit = (role, path = '') => {

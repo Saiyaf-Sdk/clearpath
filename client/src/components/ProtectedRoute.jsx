@@ -11,9 +11,10 @@ export default function RequireAuth({ children }) {
   return children;
 }
 
-// Only one role (e.g. officers) – anyone else is sent to their own dashboard
-export function RoleGate({ role }) {
+// Only some roles (e.g. officers) – anyone else is sent to their own dashboard
+export function RoleGate({ role, roles }) {
   const { user } = useAuth();
-  if (user?.role !== role) return <Navigate to={homeFor(user?.role)} replace />;
+  const allowed = roles || [role];
+  if (!allowed.includes(user?.role)) return <Navigate to={homeFor(user?.role)} replace />;
   return <Outlet />;
 }

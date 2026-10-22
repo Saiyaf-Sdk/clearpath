@@ -4,6 +4,8 @@ import useFetch from '../../hooks/useFetch';
 import {
   actionLabel, actionTone, downloadCsv, Empty, ErrorState, fmtDateTime, PageHeader, Pager, PageSkeleton, SearchInput, timeAgo,
 } from '../../components/ui';
+import FacultySelect from '../../components/FacultySelect';
+import { useAuth } from '../../context/AuthContext';
 
 const TYPES = [
   { value: '', label: 'Everything' },
@@ -19,7 +21,10 @@ export default function AdminAudit() {
   const [page, setPage] = useState(1);
   const [action, setAction] = useState('');
   const [search, setSearch] = useState('');
-  const { data, error, reload } = useFetch('/admin/audit', { params: { page, action: action || undefined, search: search || undefined } });
+  const [faculty, setFaculty] = useState('');
+  const { user } = useAuth();
+  const isUniAdmin = user.role === 'admin';
+  const { data, error, reload } = useFetch('/admin/audit', { params: { page, action: action || undefined, search: search || undefined, faculty: faculty || undefined } });
 
   if (error) return <ErrorState message={error} onRetry={reload} />;
 
@@ -33,12 +38,13 @@ export default function AdminAudit() {
     <div className="page">
       <PageHeader
         title="Audit log"
-        subtitle="A permanent record of every action in your university – who did what, and when."
+        subtitle={isUniAdmin ? 'A permanent record of every action in your university – who did what, and when.' : `Every action in the ${user.facultyInfo?.name || 'faculty'} – who did what, and when.`}
         actions={<button className="btn btn-ghost" onClick={exportPage} disabled={!data?.items?.length}><Download size={16} /> Export page</button>}
       />
       <section className="card">
         <div className="toolbar">
           <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search details (e.g. a reg. no.)" />
+          {isUniAdmin && <FacultySelect all central value={faculty} onChange={(v) => { setFaculty(v); setPage(1); }} className="input select-sm" />}
           <div className="seg">
             {TYPES.map((t) => (
               <button key={t.value} className={action === t.value ? 'active' : ''} onClick={() => { setAction(t.value); setPage(1); }}>{t.label}</button>

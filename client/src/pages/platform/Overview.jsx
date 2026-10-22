@@ -27,7 +27,7 @@ export default function PlatformOverview() {
       <motion.div className="stats stats-5" variants={stagger} initial="hidden" animate="show">
         <motion.div variants={item}><StatCard icon={Building2} tone="brand" label="Universities" value={t.universities} sub={`${t.activeUniversities} active`} /></motion.div>
         <motion.div variants={item}><StatCard icon={GraduationCap} tone="brand" label="Student accounts" value={t.students} /></motion.div>
-        <motion.div variants={item}><StatCard icon={Users} tone="brand" label="Staff accounts" value={t.officers + t.admins} sub={`${t.admins} admins`} /></motion.div>
+        <motion.div variants={item}><StatCard icon={Users} tone="brand" label="Staff accounts" value={t.officers + t.admins + (t.facultyAdmins || 0)} sub={`${t.faculties || 0} faculties · ${t.admins + (t.facultyAdmins || 0)} admins`} /></motion.div>
         <motion.div variants={item}><StatCard icon={ClipboardList} tone="brand" label="Requests" value={t.requests} sub={`${t.active} active`} /></motion.div>
         <motion.div variants={item}><StatCard icon={BadgeCheck} tone="good" label="Certificates" value={t.certificates} /></motion.div>
       </motion.div>

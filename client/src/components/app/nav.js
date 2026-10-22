@@ -1,6 +1,6 @@
 import {
   Activity, Award, BarChart3, Bell, Building2, ClipboardList, FileSpreadsheet, History, LayoutDashboard, ListChecks,
-  Receipt, Settings, Users, Wallet, Globe2,
+  Receipt, Settings, Users, Wallet, Globe2, School,
 } from 'lucide-react';
 
 // Sidebar navigation for each role. `badge` names a count from /api/stats/badges.
@@ -50,14 +50,19 @@ export const NAV = {
     {
       label: 'People & setup',
       items: [
+        { to: '/admin/faculties', label: 'Faculties', icon: School },
         { to: '/admin/students', label: 'Official student list', icon: FileSpreadsheet },
         { to: '/admin/users', label: 'Users & staff', icon: Users },
-        { to: '/admin/departments', label: 'Departments', icon: Building2 },
+        { to: '/admin/departments', label: 'Offices', icon: Building2 },
         { to: '/admin/audit', label: 'Audit log', icon: Activity },
       ],
     },
     account,
   ],
+  // Faculty admin: the admin pages for their own faculty (no faculty management)
+  get facultyadmin() {
+    return this.admin.map((g) => ({ ...g, items: g.items.filter((i) => i.to !== '/admin/faculties') }));
+  },
   superadmin: [
     {
       label: 'Platform',

@@ -6,6 +6,8 @@ import api, { errMsg } from '../../api';
 import { useDialog } from '../../context/DialogContext';
 import { useAuth } from '../../context/AuthContext';
 import { Badge, Drawer, Empty, PageHeader, Skeleton, Spin } from '../../components/ui';
+import FacultySelect, { facultyShort } from '../../components/FacultySelect';
+import useFaculties from '../../hooks/useFaculties';
 
 /* ---------------- Official student list ---------------- */
 // Minimal CSV parser (handles quotes and commas inside quotes)
@@ -38,21 +40,27 @@ function toStudents(rows) {
   const iEmail = col('email', 'universityemail', 'emailaddress');
   const iName = col('name', 'fullname', 'studentname');
   const iFac = col('faculty');
-  if (iReg < 0 || iEmail < 0 || iName < 0) throw new Error('The CSV needs the columns: regNo, email, name (faculty is optional).');
+  if (iReg < 0 || iEmail < 0 || iName < 0) throw new Error('The CSV needs the columns: regNo, email, name, faculty (faculty name or code).');
   return rows.slice(1).map((r) => ({ regNo: r[iReg] || '', email: r[iEmail] || '', name: r[iName] || '', faculty: iFac >= 0 ? r[iFac] || '' : '' }));
 }
 
-const sampleCsv = (domain) => `regNo,name,email,faculty\nEG/2022/1001,Amal Silva,amal.silva@${domain},Engineering\nSC/2022/2001,Dilini Jayasinghe,dilini.j@${domain},Science\n`;
+const sampleCsv = (domain, faculties = []) => {
+  const f1 = faculties[0]?.code || 'ENG';
+  const f2 = faculties[1]?.name || 'Faculty of Science';
+  return `regNo,name,email,faculty\nEG/2022/1001,Amal Silva,amal.silva@${domain},${f1}\nSC/2022/2001,Dilini Jayasinghe,dilini.j@${domain},${f2}\n`;
+};
 
 export default function AdminStudents() {
   const { confirm } = useDialog();
   const [data, setData] = useState(null);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
+  const [facultyView, setFacultyView] = useState('');
+  const { faculties } = useFaculties();
   const [preview, setPreview] = useState(null);
   const [result, setResult] = useState(null);
   const [importing, setImporting] = useState(false);
-  const [form, setForm] = useState({ regNo: '', name: '', email: '', faculty: '' });
+  const [form, setForm] = useState({ regNo: '', name: '', email: '', facultyId: '' });
   const [edit, setEdit] = useState(null);
   const [saving, setSaving] = useState(false);
   const { sorted, th } = useSort(data?.rows, { key: '', dir: 'asc' });
@@ -61,7 +69,7 @@ export default function AdminStudents() {
     e.preventDefault();
     setSaving(true);
     try {
-      await api.patch(`/admin/roster/${edit._id}`, { regNo: edit.regNo, name: edit.name, email: edit.email, faculty: edit.faculty });
+      await api.patch(`/admin/roster/${edit._id}`, { regNo: edit.regNo, name: edit.name, email: edit.email, facultyId: edit.facultyId });
       toast.success('Student record updated');
       setEdit(null);
       load();
@@ -72,11 +80,12 @@ export default function AdminStudents() {
     }
   };
   const { user } = useAuth();
+  const isUniAdmin = user.role === 'admin';
   const domains = user.university?.domains || [];
 
-  const load = () => api.get('/admin/roster', { params: { search: search || undefined, status: status || undefined } })
+  const load = () => api.get('/admin/roster', { params: { search: search || undefined, status: status || undefined, faculty: facultyView || undefined } })
     .then((r) => setData(r.data)).catch((e) => toast.error(errMsg(e)));
-  useEffect(() => { load(); }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [status, facultyView]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onFile = async (file) => {
     if (!file) return;
@@ -110,7 +119,7 @@ export default function AdminStudents() {
     try {
       await api.post('/admin/roster', form);
       toast.success(`${form.name} added to the student list`);
-      setForm({ regNo: '', name: '', email: '', faculty: '' });
+      setForm({ regNo: '', name: '', email: '', facultyId: isUniAdmin ? form.facultyId : '' });
       load();
     } catch (err) {
       toast.error(errMsg(err));
@@ -130,7 +139,7 @@ export default function AdminStudents() {
   };
 
   const downloadSample = () => {
-    const url = URL.createObjectURL(new Blob([sampleCsv(domains[0] || 'university.ac.lk')], { type: 'text/csv' }));
+    const url = URL.createObjectURL(new Blob([sampleCsv(domains[0] || 'university.ac.lk', faculties || [])], { type: 'text/csv' }));
     const a = document.createElement('a');
     a.href = url;
     a.download = 'student-list-sample.csv';
@@ -142,19 +151,19 @@ export default function AdminStudents() {
 
   return (
     <div className="page">
-      <PageHeader title="Official student list" subtitle="The registrar's list of enrolled students. Only students on it can create a ClearPath account." />
+      <PageHeader title="Official student list" subtitle={isUniAdmin ? "The registrar's list of enrolled students, by faculty. Only students on it can create a ClearPath account." : `The ${user.facultyInfo?.name || 'faculty'} students on the registrar's list. Only students on it can create a ClearPath account.`} />
       <div className="policy-note" style={{ marginBottom: 18 }}>
         <Info size={16} />
         <span>
           Only students on this list can create an account, using their own university email
-          {domains.length ? ` (${domains.map((d) => `@${d}`).join(' or ')})` : ''}. Import the list from the registrar's records each intake.
+          {domains.length ? ` (${domains.map((d) => `@${d}`).join(' or ')})` : ''}, on their own faculty&rsquo;s portal. Import the list from the registrar&rsquo;s records each intake.
         </span>
       </div>
 
       <div className="grid-2" style={{ alignItems: 'start', marginBottom: 20 }}>
         <section className="card" style={{ margin: 0 }}>
           <h2><Upload size={17} className="text-brand" style={{ verticalAlign: -3, marginRight: 6 }} />Import from CSV</h2>
-          <p className="muted small" style={{ margin: '4px 0 14px' }}>Columns: regNo, name, email, faculty. Existing students are updated, students who already have an account are skipped.</p>
+          <p className="muted small" style={{ margin: '4px 0 14px' }}>Columns: regNo, name, email, faculty (name or code{isUniAdmin ? '' : `; only ${user.facultyInfo?.code || 'your faculty'}`}). Existing students are updated, students who already have an account are skipped.</p>
           <label className="dropzone">
             <FileSpreadsheet size={20} />
             <span>{preview ? preview.name : 'Choose a CSV file'}</span>
@@ -186,7 +195,9 @@ export default function AdminStudents() {
             <label className="label">Registration no.<input className="input" required value={form.regNo} onChange={(e) => setForm({ ...form, regNo: e.target.value })} /></label>
             <label className="label">Full name<input className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
             <label className="label">University email<input className="input" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
-            <label className="label">Faculty<input className="input" value={form.faculty} onChange={(e) => setForm({ ...form, faculty: e.target.value })} /></label>
+            {isUniAdmin
+              ? <label className="label">Faculty<FacultySelect required value={form.facultyId} onChange={(v) => setForm({ ...form, facultyId: v })} /></label>
+              : <label className="label">Faculty<input className="input" disabled value={user.facultyInfo?.name || ''} /></label>}
             <div><button className="btn btn-primary btn-sm">Add to list</button></div>
           </form>
         </section>
@@ -198,6 +209,7 @@ export default function AdminStudents() {
             <Search size={16} />
             <input className="input" placeholder="Search reg no., name or email and press Enter" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
+          {isUniAdmin && <FacultySelect all value={facultyView} onChange={setFacultyView} className="input select-sm" />}
           <select className="input" style={{ width: 'auto' }} value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">Everyone</option>
             <option value="pending">Not registered yet</option>
@@ -215,7 +227,7 @@ export default function AdminStudents() {
                     <td><strong>{r.regNo}</strong></td>
                     <td>{r.name}</td>
                     <td className="small">{r.email}</td>
-                    <td className="small">{r.faculty || '—'}</td>
+                    <td className="small" title={r.faculty}>{r.faculty ? facultyShort(r.faculty) : '—'}</td>
                     <td><Badge status={r.status === 'activated' ? 'activated' : 'invited'} /></td>
                     <td><div className="actions end">
                       <button className="btn btn-ghost btn-sm" onClick={() => setEdit({ ...r })} aria-label={`Edit ${r.name}`} title="Edit"><PencilLine size={14} /></button>
@@ -235,7 +247,9 @@ export default function AdminStudents() {
             <label className="label">Registration no.<input className="input" required disabled={edit.status === 'activated'} value={edit.regNo} onChange={(e) => setEdit({ ...edit, regNo: e.target.value })} /></label>
             <label className="label">Full name<input className="input" required value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></label>
             <label className="label">University email<input className="input" type="email" required disabled={edit.status === 'activated'} value={edit.email} onChange={(e) => setEdit({ ...edit, email: e.target.value })} /></label>
-            <label className="label">Faculty<input className="input" value={edit.faculty || ''} onChange={(e) => setEdit({ ...edit, faculty: e.target.value })} /></label>
+            {isUniAdmin
+              ? <label className="label">Faculty<FacultySelect required value={edit.facultyId || ''} onChange={(v) => setEdit({ ...edit, facultyId: v })} /></label>
+              : <label className="label">Faculty<input className="input" disabled value={edit.faculty || ''} /></label>}
             <div className="row-gap">
               <button className="btn btn-primary" disabled={saving}>{saving ? <Spin /> : <PencilLine size={16} />} Save changes</button>
               <button type="button" className="btn btn-ghost" onClick={() => setEdit(null)}>Cancel</button>
