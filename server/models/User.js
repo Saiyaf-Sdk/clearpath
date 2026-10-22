@@ -13,10 +13,15 @@ const userSchema = new mongoose.Schema(
       match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email'],
     },
     password: { type: String, required: true, minlength: 6, select: false },
-    role: { type: String, enum: ['student', 'officer', 'admin', 'superadmin'], default: 'student' },
+    // admin = university admin, facultyadmin = manages one faculty, superadmin = platform admin
+    role: { type: String, enum: ['student', 'officer', 'facultyadmin', 'admin', 'superadmin'], default: 'student' },
 
     // Which university this account belongs to (empty only for the platform admin)
     university: { type: mongoose.Schema.Types.ObjectId, ref: 'University', index: true },
+
+    // The faculty this account belongs to (students, faculty admins, and officers of a faculty office).
+    // Empty for university-level staff (university admin, central office officers). `faculty` keeps the name as text.
+    facultyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Faculty', index: true },
 
     // Student-only fields
     regNo: { type: String, trim: true, uppercase: true },

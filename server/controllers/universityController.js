@@ -2,7 +2,8 @@ const University = require('../models/University');
 const User = require('../models/User');
 const EnrolledStudent = require('../models/EnrolledStudent');
 const { asyncHandler, ApiError } = require('../middleware/error');
-const { universityForEmail, universityForPortal, publicUniversity, emailBelongsTo, RESERVED } = require('../utils/policy');
+const { universityForEmail, universityForPortal, publicUniversity, publicFaculty, facultyForPortal, emailBelongsTo, RESERVED } = require('../utils/policy');
+const Faculty = require('../models/Faculty');
 const { audit } = require('../utils/helpers');
 const { saveUpload, removeByUrl } = require('../utils/files');
 const { bundledFor, isBundled, LOGO_PREFIX } = require('../utils/logos');
@@ -31,7 +32,21 @@ exports.getPortal = asyncHandler(async (req, res) => {
   const university = await universityForPortal(req.params.portal);
   if (!university) throw new ApiError(404, 'We could not find this university portal');
   if (!university.isActive) throw new ApiError(403, `${university.name} is not active on ClearPath yet`);
-  res.json(publicUniversity(university));
+  const faculties = await Faculty.find({ university: university._id, isActive: true }).sort('order name');
+  res.json({ ...publicUniversity(university), faculties: faculties.map(publicFaculty) });
+});
+
+// GET /api/universities/:portal/:faculty  – one faculty portal (or "central" for Central administration)
+exports.getFacultyPortal = asyncHandler(async (req, res) => {
+  const university = await universityForPortal(req.params.portal);
+  if (!university) throw new ApiError(404, 'We could not find this university portal');
+  if (!university.isActive) throw new ApiError(403, `${university.name} is not active on ClearPath yet`);
+  const found = await facultyForPortal(university._id, req.params.faculty);
+  if (!found) throw new ApiError(404, `We could not find this faculty at ${university.name}`);
+  res.json({
+    ...publicUniversity(university),
+    faculty: found.central ? { slug: 'central', name: 'Central administration', central: true } : publicFaculty(found.faculty),
+  });
 });
 
 /* ---------- Platform admin ---------- */
@@ -58,15 +73,16 @@ const checkDomains = async (domains = [], exceptId) => {
 
 // GET /api/platform/universities
 exports.listAll = asyncHandler(async (req, res) => {
-  const [unis, counts, roster] = await Promise.all([
+  const [unis, counts, roster, facs] = await Promise.all([
     University.find().sort('name').lean(),
     User.aggregate([{ $match: { university: { $ne: null } } }, { $group: { _id: { u: '$university', role: '$role' }, n: { $sum: 1 } } }]),
     EnrolledStudent.aggregate([{ $group: { _id: '$university', n: { $sum: 1 } } }]),
+    Faculty.aggregate([{ $group: { _id: '$university', n: { $sum: 1 } } }]),
   ]);
   const count = (id, role) => counts.find((c) => String(c._id.u) === String(id) && c._id.role === role)?.n || 0;
   res.json(unis.map((u) => ({
     ...u,
-    stats: { students: count(u._id, 'student'), officers: count(u._id, 'officer'), admins: count(u._id, 'admin'), onList: roster.find((r) => String(r._id) === String(u._id))?.n || 0 },
+    stats: { students: count(u._id, 'student'), officers: count(u._id, 'officer'), admins: count(u._id, 'admin'), facultyAdmins: count(u._id, 'facultyadmin'), faculties: facs.find((f) => String(f._id) === String(u._id))?.n || 0, onList: roster.find((r) => String(r._id) === String(u._id))?.n || 0 },
   })));
 });
 

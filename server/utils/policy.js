@@ -1,6 +1,7 @@
 // Finds which university an email belongs to, from its domain.
 // e.g. someone@ruh.ac.lk or someone@stu.ruh.ac.lk -> University of Ruhuna
 const University = require('../models/University');
+const Faculty = require('../models/Faculty');
 const { emailEnabled } = require('./mailer');
 
 const domainOf = (email) => String(email || '').toLowerCase().trim().split('@')[1] || '';
@@ -37,6 +38,20 @@ const universityForPortal = async (portal) => {
   return University.findOne({ $or: [{ slug: v }, { code: v.toUpperCase() }] });
 };
 
+// Faculty portals: /portal/<university>/<faculty>. "central" is the university's central administration
+// (the university admin and the central offices such as the main library and the bursar).
+const CENTRAL = 'central';
+const FACULTY_RESERVED = [CENTRAL, 'register', 'login'];
+const publicFaculty = (f) => f && f.name && { id: f._id, name: f.name, code: f.code, slug: f.slug, location: f.location || null };
+// Returns { central: true } for the central administration, { faculty } for a faculty, or null when not found
+const facultyForPortal = async (universityId, slug) => {
+  const v = String(slug || '').toLowerCase().trim();
+  if (!v) return null;
+  if (v === CENTRAL) return { central: true, faculty: null };
+  const faculty = await Faculty.findOne({ university: universityId, slug: v, isActive: true });
+  return faculty ? { central: false, faculty } : null;
+};
+
 // Show codes/links on screen only when no email is configured AND we are in local development
 // (or DEMO_MODE=true is set explicitly for a project demonstration)
 const devMode = () => !emailEnabled() && (process.env.NODE_ENV !== 'production' || process.env.DEMO_MODE === 'true');
@@ -46,4 +61,4 @@ const maskEmail = (email) => {
   return `${user.slice(0, 2)}${'•'.repeat(Math.max(1, user.length - 2))}@${domain}`;
 };
 
-module.exports = { domainOf, universityForEmail, universityForPortal, emailBelongsTo, publicUniversity, slugOf, devMode, maskEmail, RESERVED };
+module.exports = { domainOf, universityForEmail, universityForPortal, emailBelongsTo, publicUniversity, slugOf, devMode, maskEmail, RESERVED, CENTRAL, FACULTY_RESERVED, publicFaculty, facultyForPortal };

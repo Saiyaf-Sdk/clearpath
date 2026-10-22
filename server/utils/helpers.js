@@ -19,6 +19,7 @@ const audit = async (actor, action, target, details) => {
       actor: idOf(actor),
       university: idOf(actor?.university),
       department: idOf(actor?.department),
+      faculty: idOf(actor?.facultyId) || idOf(actor?.department?.faculty) || undefined,
       action,
       target: String(target || ''),
       details,

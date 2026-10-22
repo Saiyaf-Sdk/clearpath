@@ -4,7 +4,7 @@ const ClearanceRequest = require('../models/ClearanceRequest');
 const Department = require('../models/Department');
 const { asyncHandler, ApiError } = require('../middleware/error');
 const { audit, notify, notifyOfficers } = require('../utils/helpers');
-const { uniOf } = require('../middleware/auth');
+const { uniOf, facOf } = require('../middleware/auth');
 const { sendMail } = require('../utils/mailer');
 const { saveUpload, removeByUrl } = require('../utils/files');
 
@@ -72,8 +72,11 @@ exports.getDepartmentDues = asyncHandler(async (req, res) => {
 exports.lookupStudent = asyncHandler(async (req, res) => {
   const regNo = String(req.query.regNo || '').toUpperCase().trim();
   if (!regNo) throw new ApiError(400, 'Registration number is required');
-  const student = await User.findOne({ regNo, role: 'student', university: uniOf(req) }).select('name regNo faculty email').lean();
-  if (!student) throw new ApiError(404, `No student with registration number ${regNo}`);
+  // A faculty office only deals with its own faculty's students; central offices with everyone
+  const student = await User.findOne({ regNo, role: 'student', university: uniOf(req), ...(facOf(req) ? { facultyId: facOf(req) } : {}) })
+    .select('name regNo faculty email')
+    .lean();
+  if (!student) throw new ApiError(404, facOf(req) ? `No student of your faculty with registration number ${regNo}` : `No student with registration number ${regNo}`);
   const deptId = deptOf(req);
   const [openDues, active] = await Promise.all([
     deptId ? Due.countDocuments({ student: student._id, department: deptId, status: { $in: OPEN_DUE } }) : 0,
@@ -95,14 +98,24 @@ exports.addDue = asyncHandler(async (req, res) => {
 
   const dept = await Department.findOne({ _id: deptId, university: uniOf(req) });
   if (!dept) throw new ApiError(404, 'Department not found');
-  // Look the student up inside this university only
-  const student = await User.findOne({ regNo: String(regNo).toUpperCase().trim(), role: 'student', university: uniOf(req) });
-  if (!student) throw new ApiError(404, `No student found with registration number ${String(regNo).toUpperCase()}`);
+  // Look the student up inside this university only – and inside the faculty, for a faculty office
+  const student = await User.findOne({
+    regNo: String(regNo).toUpperCase().trim(),
+    role: 'student',
+    university: uniOf(req),
+    ...(dept.faculty ? { facultyId: dept.faculty } : {}),
+  });
+  if (!student) {
+    throw new ApiError(404, dept.faculty
+      ? `No student of this faculty with registration number ${String(regNo).toUpperCase()}`
+      : `No student found with registration number ${String(regNo).toUpperCase()}`);
+  }
 
   const due = await Due.create({
     student: student._id,
     department: deptId,
     university: uniOf(req),
+    faculty: student.facultyId || undefined,
     amount: Math.round(amount * 100) / 100,
     description,
     addedBy: req.user._id,

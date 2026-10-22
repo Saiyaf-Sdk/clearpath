@@ -14,7 +14,7 @@ const protect = asyncHandler(async (req, res, next) => {
     throw new ApiError(401, 'Session expired, please log in again');
   }
 
-  const user = await User.findById(decoded.id).populate('department', 'name code').populate('university');
+  const user = await User.findById(decoded.id).populate('department', 'name code faculty').populate('university').populate('facultyId', 'name code slug location isActive');
   if (!user || !user.isActive) throw new ApiError(401, 'Account not found or disabled');
   if (user.role !== 'superadmin' && user.university && !user.university.isActive) {
     throw new ApiError(403, 'Your university is not active on ClearPath');
@@ -37,3 +37,12 @@ module.exports = { protect, authorize };
 const uniOf = (req) => req.user.university?._id || req.user.university;
 
 module.exports.uniOf = uniOf;
+
+// The faculty id of the signed-in user (students, faculty admins, faculty officers); null for university-level staff
+const facOf = (req) => req.user.facultyId?._id || req.user.facultyId || null;
+module.exports.facOf = facOf;
+
+// Extra filter that limits a faculty admin to their own faculty; university admins see the whole university.
+// field: the faculty field of the collection being queried ('faculty' or 'facultyId')
+const facultyScope = (req, field = 'faculty') => (req.user.role === 'facultyadmin' ? { [field]: facOf(req) } : {});
+module.exports.facultyScope = facultyScope;

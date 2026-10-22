@@ -4,7 +4,7 @@ const { protect, authorize } = require('../middleware/auth');
 
 router.use(protect);
 router.get('/badges', c.badges);
-router.get('/officer', authorize('officer', 'admin'), c.officerOverview);
-router.get('/officer/activity', authorize('officer', 'admin'), c.officerActivity);
+router.get('/officer', authorize('officer', 'admin', 'facultyadmin'), c.officerOverview);
+router.get('/officer/activity', authorize('officer', 'admin', 'facultyadmin'), c.officerActivity);
 
 module.exports = router;

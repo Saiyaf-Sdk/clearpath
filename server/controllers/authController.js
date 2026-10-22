@@ -1,7 +1,8 @@
 const crypto = require('crypto');
 const User = require('../models/User');
 const EnrolledStudent = require('../models/EnrolledStudent');
-const { universityForEmail, universityForPortal, publicUniversity, devMode, maskEmail } = require('../utils/policy');
+const { universityForEmail, universityForPortal, publicUniversity, publicFaculty, facultyForPortal, CENTRAL, devMode, maskEmail } = require('../utils/policy');
+const Faculty = require('../models/Faculty');
 const { asyncHandler, ApiError } = require('../middleware/error');
 const { saveUpload, removeByUrl } = require('../utils/files');
 const { signToken, audit, appUrl } = require('../utils/helpers');
@@ -21,6 +22,8 @@ const publicUser = (u) => ({
   department: u.department,
   // The university portal this account belongs to (logo + name shown in the app)
   university: u.university && u.university.name ? publicUniversity(u.university) : undefined,
+  // The faculty portal this account signs in on (empty = central administration)
+  facultyInfo: u.facultyId && u.facultyId.name ? publicFaculty(u.facultyId) : undefined,
 });
 
 /* ---------------- Student registration (verified) ----------------
@@ -35,6 +38,23 @@ const portalMismatch = (emailUni, portalUni) =>
     code: 'WRONG_PORTAL',
     portal: publicUniversity(emailUni),
   });
+
+// A student registers on their own faculty's portal (the faculty on the official student list)
+const facultyMismatch = (faculty, universityDoc) =>
+  new ApiError(400, `You are listed under the ${faculty.name}. Please create your account on that faculty's portal.`, {
+    code: 'WRONG_FACULTY',
+    portal: { ...publicUniversity(universityDoc), faculty: publicFaculty(faculty) },
+  });
+
+const checkFaculty = async (entry, university, facultySlug) => {
+  if (!facultySlug || !entry) return;
+  if (String(facultySlug).toLowerCase() === CENTRAL) {
+    throw new ApiError(400, 'Students create their account on their faculty portal, not on Central administration. Go back and choose your faculty.');
+  }
+  if (!entry.facultyId) return; // list entry without a faculty: any faculty of the university may register it
+  const own = await Faculty.findById(entry.facultyId);
+  if (own && own.slug !== String(facultySlug).toLowerCase()) throw facultyMismatch(own, university);
+};
 
 const findEnrolled = async (regNo, email, withOtp = false, portal) => {
   const university = await universityForEmail(email);
@@ -59,8 +79,9 @@ const accountExists = (entry) =>
 
 const NOT_A_UNIVERSITY = "This email doesn't belong to a university on ClearPath. Please use your university email (for example name@ruh.ac.lk).";
 
-const checkCode = async (regNo, email, code, portal) => {
+const checkCode = async (regNo, email, code, portal, facultySlug) => {
   const { university, entry } = await findEnrolled(regNo, email, true, portal);
+  await checkFaculty(entry, university, facultySlug);
   if (!entry || !entry.otpHash) throw new ApiError(400, 'Please request a new verification code.');
   if (!entry.otpExpires || entry.otpExpires < new Date()) throw new ApiError(400, 'This code has expired. Please request a new one.');
   if (entry.otpAttempts >= 5) throw new ApiError(429, 'Too many incorrect attempts. Please request a new code.');
@@ -74,13 +95,14 @@ const checkCode = async (regNo, email, code, portal) => {
 
 // POST /api/auth/register/start  body: { university (portal), regNo, email }
 exports.registerStart = asyncHandler(async (req, res) => {
-  const { regNo, email, university: portal } = req.body;
+  const { regNo, email, university: portal, faculty: facultySlug } = req.body;
   if (!regNo || !email) throw new ApiError(400, 'Registration number and university email are required');
   const { university, entry } = await findEnrolled(regNo, email, false, portal);
   if (!university) throw new ApiError(400, NOT_A_UNIVERSITY);
   if (!entry) {
     throw new ApiError(404, `We couldn't find this registration number with this email on the ${university.name} student list. Check both, or contact your Student Affairs office.`);
   }
+  await checkFaculty(entry, university, facultySlug);
   if (entry.status === 'activated' || (await accountExists(entry))) {
     throw new ApiError(409, 'An account already exists for this student. Please log in, or use Forgot password.');
   }
@@ -112,16 +134,16 @@ exports.registerStart = asyncHandler(async (req, res) => {
 
 // POST /api/auth/register/verify  body: { regNo, email, code }
 exports.registerVerify = asyncHandler(async (req, res) => {
-  const { regNo, email, code, university: portal } = req.body;
-  const { university, entry } = await checkCode(regNo, email, code, portal);
+  const { regNo, email, code, university: portal, faculty: facultySlug } = req.body;
+  const { university, entry } = await checkCode(regNo, email, code, portal, facultySlug);
   res.json({ name: entry.name, faculty: entry.faculty, regNo: entry.regNo, university: publicUniversity(university) });
 });
 
 // POST /api/auth/register/complete  body: { regNo, email, code, password, phone }
 exports.registerComplete = asyncHandler(async (req, res) => {
-  const { regNo, email, code, password, phone, university: portal } = req.body;
+  const { regNo, email, code, password, phone, university: portal, faculty: facultySlug } = req.body;
   if (!password || password.length < 6) throw new ApiError(400, 'Password must be at least 6 characters');
-  const { university, entry } = await checkCode(regNo, email, code, portal);
+  const { university, entry } = await checkCode(regNo, email, code, portal, facultySlug);
   if (await accountExists(entry)) throw new ApiError(409, 'An account already exists for this student. Please log in.');
 
   const user = await User.create({
@@ -130,11 +152,13 @@ exports.registerComplete = asyncHandler(async (req, res) => {
     password,
     regNo: entry.regNo,
     faculty: entry.faculty,
+    facultyId: entry.facultyId,
     phone,
     role: 'student',
     university: university._id,
   });
   user.university = university; // so the response carries the logo and name
+  if (entry.facultyId) user.facultyId = await Faculty.findById(entry.facultyId);
 
   entry.status = 'activated';
   entry.activatedAt = new Date();
@@ -147,17 +171,18 @@ exports.registerComplete = asyncHandler(async (req, res) => {
   res.status(201).json({ token: signToken(user), user: publicUser(user) });
 });
 
-// POST /api/auth/login  body: { email, password, university (portal) }
-// Students, officers and admins sign in on their own university's portal.
-// The platform admin signs in on the separate platform page (no university).
+// POST /api/auth/login  body: { email, password, university (portal), faculty (faculty portal or "central") }
+// Students, faculty officers and faculty admins sign in on their faculty's portal; the university admin and
+// central office officers on "Central administration". The platform admin uses the separate platform page.
 exports.login = asyncHandler(async (req, res) => {
-  const { email, password, university: portal } = req.body;
+  const { email, password, university: portal, faculty: facultySlug } = req.body;
   if (!email || !password) throw new ApiError(400, 'Email and password are required');
 
   const user = await User.findOne({ email: String(email).toLowerCase().trim() })
     .select('+password')
     .populate('department', 'name code')
-    .populate('university');
+    .populate('university')
+    .populate('facultyId', 'name code slug location');
   if (!user || !(await user.matchPassword(password))) throw new ApiError(401, 'Invalid email or password');
   if (!user.isActive) throw new ApiError(403, 'Your account has been disabled');
   if (user.role !== 'superadmin' && user.university && !user.university.isActive) {
@@ -179,6 +204,17 @@ exports.login = asyncHandler(async (req, res) => {
         code: 'WRONG_PORTAL',
         portal: publicUniversity(own),
       });
+    }
+    // The right faculty door (or Central administration for university-level staff)
+    const ownFaculty = user.facultyId; // populated, or null for central staff
+    const door = ownFaculty ? `the ${ownFaculty.name} portal` : 'Central administration';
+    const expected = ownFaculty ? ownFaculty.slug : CENTRAL;
+    const where = { ...publicUniversity(own), faculty: ownFaculty ? publicFaculty(ownFaculty) : { slug: CENTRAL, name: 'Central administration' } };
+    if (!facultySlug) {
+      throw new ApiError(400, `Please choose your faculty first. Your account signs in on ${door}.`, { code: 'CHOOSE_FACULTY', portal: where });
+    }
+    if (String(facultySlug).toLowerCase() !== expected) {
+      throw new ApiError(400, `This account signs in on ${door}, not here.`, { code: 'WRONG_FACULTY', portal: where });
     }
   }
 
@@ -204,7 +240,7 @@ exports.updateProfile = asyncHandler(async (req, res) => {
     user.name = name;
   }
   await user.save();
-  const full = await User.findById(user._id).populate('department', 'name code').populate('university');
+  const full = await User.findById(user._id).populate('department', 'name code').populate('university').populate('facultyId', 'name code slug location');
   res.json({ user: publicUser(full) });
 });
 
@@ -216,7 +252,7 @@ exports.uploadAvatar = asyncHandler(async (req, res) => {
   await removeByUrl(user.avatarUrl);
   user.avatarUrl = url;
   await user.save();
-  const full = await User.findById(user._id).populate('department', 'name code').populate('university');
+  const full = await User.findById(user._id).populate('department', 'name code').populate('university').populate('facultyId', 'name code slug location');
   res.json({ user: publicUser(full) });
 });
 
@@ -227,7 +263,7 @@ exports.removeAvatar = asyncHandler(async (req, res) => {
   await removeByUrl(user.avatarUrl);
   user.avatarUrl = undefined;
   await user.save();
-  const full = await User.findById(user._id).populate('department', 'name code').populate('university');
+  const full = await User.findById(user._id).populate('department', 'name code').populate('university').populate('facultyId', 'name code slug location');
   res.json({ user: publicUser(full) });
 });
 
@@ -274,9 +310,14 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
 
 // GET /api/auth/reset-password/:token  -> is the link still valid?
 exports.checkResetToken = asyncHandler(async (req, res) => {
-  const user = await User.findOne({ resetPasswordToken: sha256(req.params.token), resetPasswordExpires: { $gt: new Date() } }).populate('university');
+  const user = await User.findOne({ resetPasswordToken: sha256(req.params.token), resetPasswordExpires: { $gt: new Date() } }).populate('university').populate('facultyId', 'name code slug location');
   if (!user) throw new ApiError(400, 'This reset link is invalid or has expired.');
-  res.json({ valid: true, email: user.email, university: user.university ? publicUniversity(user.university) : null });
+  res.json({
+    valid: true,
+    email: user.email,
+    university: user.university ? publicUniversity(user.university) : null,
+    faculty: user.university ? (user.facultyId ? publicFaculty(user.facultyId) : { slug: CENTRAL, name: 'Central administration' }) : null,
+  });
 });
 
 // POST /api/auth/reset-password/:token  body: { password }

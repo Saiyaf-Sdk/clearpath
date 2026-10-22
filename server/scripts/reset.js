@@ -19,6 +19,8 @@ const Certificate = require('../models/Certificate');
 const AuditLog = require('../models/AuditLog');
 const Notification = require('../models/Notification');
 const StoredFile = require('../models/StoredFile');
+const Faculty = require('../models/Faculty');
+const FACULTIES = require('../data/faculties');
 const UNIVERSITIES = require('../data/universities');
 const { applyBundledLogos } = require('../utils/logos');
 
@@ -45,7 +47,7 @@ const value = (name) => {
   const db = mongoose.connection.db;
   console.log(`Connected to database "${db.databaseName}". Deleting all data…`);
 
-  const models = [University, User, Department, Due, EnrolledStudent, ClearanceRequest, Certificate, AuditLog, Notification, StoredFile];
+  const models = [University, Faculty, User, Department, Due, EnrolledStudent, ClearanceRequest, Certificate, AuditLog, Notification, StoredFile];
   const existing = (await db.listCollections().toArray()).map((c) => c.name);
   for (const name of existing) await db.collection(name).drop().catch(() => {}); // eslint-disable-line no-await-in-loop
   console.log(`Removed ${existing.length} collection(s).`);
@@ -54,10 +56,12 @@ const value = (name) => {
     console.log('\nThe database is now completely empty. Nobody can log in until you run "npm run seed" or "npm run reset -- --yes".');
   } else {
     await Promise.all(models.map((m) => m.syncIndexes()));
-    await University.insertMany(UNIVERSITIES);
+    const unis = await University.insertMany(UNIVERSITIES);
+    // every university starts with its faculties (no offices or people yet)
+    await Faculty.insertMany(unis.flatMap((u) => (FACULTIES[u.slug] || []).map((f, i) => ({ ...f, order: i, university: u._id }))));
     await applyBundledLogos();
     await User.create({ name: 'ClearPath Platform Admin', email, password, role: 'superadmin' });
-    console.log(`\nFresh start ready: ${UNIVERSITIES.length} universities, no users except the platform admin.`);
+    console.log(`\nFresh start ready: ${UNIVERSITIES.length} universities with their faculties, no users except the platform admin.`);
     console.log('──────────────────────────────────────────────');
     console.log(` Platform admin email:    ${email}`);
     console.log(` Platform admin password: ${password}`);

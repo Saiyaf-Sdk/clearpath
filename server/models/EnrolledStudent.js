@@ -8,7 +8,8 @@ const enrolledStudentSchema = new mongoose.Schema(
     regNo: { type: String, required: [true, 'Registration number is required'], uppercase: true, trim: true },
     email: { type: String, required: [true, 'Email is required'], lowercase: true, trim: true, match: [/^\S+@\S+\.\S+$/, 'Invalid email'] },
     name: { type: String, required: [true, 'Name is required'], trim: true },
-    faculty: { type: String, trim: true },
+    facultyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Faculty', index: true },
+    faculty: { type: String, trim: true }, // faculty name as text (kept in sync with facultyId)
     status: { type: String, enum: ['pending', 'activated'], default: 'pending' },
     activatedAt: Date,
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

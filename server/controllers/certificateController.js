@@ -7,17 +7,20 @@ const { publicUniversity } = require('../utils/policy');
 const { appUrl } = require('../utils/helpers');
 const { readByUrl } = require('../utils/files');
 
-// GET /api/certificates/:requestId/pdf  (student who owns it, or admin)
+// GET /api/certificates/:requestId/pdf  (student who owns it, or their university / faculty admin)
 exports.downloadPdf = asyncHandler(async (req, res) => {
   const cert = await Certificate.findOne({ request: req.params.requestId }).populate('student', 'name regNo faculty email avatarUrl').populate('university');
   if (!cert) throw new ApiError(404, 'Certificate not issued yet');
   if (req.user.role === 'student' && String(cert.student._id) !== String(req.user._id)) {
     throw new ApiError(403, 'Not your certificate');
   }
-  if (req.user.role === 'admin' && String(cert.university?._id) !== String(req.user.university?._id)) {
+  if (['admin', 'facultyadmin'].includes(req.user.role) && String(cert.university?._id) !== String(req.user.university?._id)) {
     throw new ApiError(403, 'This certificate belongs to another university');
   }
-  const request = await ClearanceRequest.findById(cert.request).populate('items.department', 'name order');
+  const request = await ClearanceRequest.findById(cert.request).populate('items.department', 'name order').populate('faculty', 'name');
+  if (req.user.role === 'facultyadmin' && String(request?.faculty?._id) !== String(req.user.facultyId?._id || req.user.facultyId)) {
+    throw new ApiError(403, 'This certificate belongs to another faculty');
+  }
   const verifyUrl = (no) => `${appUrl(req)}/verify/${no}`;
   const qrPng = await QRCode.toBuffer(verifyUrl(cert.certificateNo), { width: 300, margin: 1 });
   const logo = (await readByUrl(cert.university?.logoUrl))?.buffer || null;

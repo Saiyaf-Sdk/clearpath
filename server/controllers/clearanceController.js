@@ -4,14 +4,14 @@ const Due = require('../models/Due');
 const Certificate = require('../models/Certificate');
 const { asyncHandler, ApiError } = require('../middleware/error');
 const { audit, notify, notifyOfficers, issueCertificate } = require('../utils/helpers');
-const { uniOf } = require('../middleware/auth');
+const { uniOf, facOf, facultyScope } = require('../middleware/auth');
 const { sendMail } = require('../utils/mailer');
 
 const OPEN_DUE = ['unpaid', 'receipt-submitted'];
 const REASONS = ['graduation', 'transfer', 'withdrawal', 'other'];
 
 const populateRequest = (q) =>
-  q.populate('student', 'name email regNo faculty avatarUrl').populate('items.department', 'name code order').populate('items.actionedBy', 'name');
+  q.populate('student', 'name email regNo faculty avatarUrl').populate('items.department', 'name code order faculty').populate('items.actionedBy', 'name');
 
 const progressOf = (items = []) => ({
   total: items.length,
@@ -28,9 +28,18 @@ exports.createRequest = asyncHandler(async (req, res) => {
   const open = await ClearanceRequest.findOne({ student: req.user._id, status: { $in: ['pending', 'in-progress'] } });
   if (open) throw new ApiError(400, 'You already have an active clearance request');
 
-  // Only this student's university's departments take part
-  const departments = await Department.find({ isActive: true, university: uniOf(req) }).sort('order name');
-  if (departments.length === 0) throw new ApiError(400, 'No departments are set up yet. Contact the admin.');
+  // The university's central offices plus the offices of the student's own faculty take part
+  const faculty = facOf(req);
+  const departments = await Department.find({
+    isActive: true,
+    university: uniOf(req),
+    $or: [{ faculty: null }, ...(faculty ? [{ faculty }] : [])],
+  })
+    .populate('faculty', 'name')
+    .sort('order name');
+  // faculty offices first, then the central offices, each in their display order
+  departments.sort((a, b) => (a.faculty ? 0 : 1) - (b.faculty ? 0 : 1) || a.order - b.order);
+  if (departments.length === 0) throw new ApiError(400, 'No offices are set up for your faculty yet. Contact your faculty admin.');
 
   // Departments where the student already owes something start as "dues"
   const owing = (await Due.distinct('department', { student: req.user._id, status: { $in: OPEN_DUE } })).map(String);
@@ -38,6 +47,7 @@ exports.createRequest = asyncHandler(async (req, res) => {
   const request = new ClearanceRequest({
     student: req.user._id,
     university: uniOf(req),
+    faculty: faculty || undefined,
     reason,
     note,
     items: departments.map((d) => ({
@@ -58,7 +68,7 @@ exports.createRequest = asyncHandler(async (req, res) => {
   });
   await notify(req.user, {
     title: 'Request submitted',
-    body: `Your ${reason} clearance request was sent to ${departments.length} departments.`,
+    body: `Your ${reason} clearance request was sent to ${departments.length} offices.`,
     link: '/student/clearance',
     kind: 'success',
     university: uniOf(req),
@@ -119,7 +129,7 @@ exports.cancelRequest = asyncHandler(async (req, res) => {
 
 // GET /api/clearances/department?status=pending&search=abc  (officer: own dept, admin: ?department=<id>)
 exports.getDepartmentRequests = asyncHandler(async (req, res) => {
-  const deptId = req.user.role === 'admin' ? req.query.department : req.user.department?._id;
+  const deptId = ['admin', 'facultyadmin'].includes(req.user.role) ? req.query.department : req.user.department?._id;
   if (!deptId) throw new ApiError(400, 'No department assigned to this account');
   if (!(await Department.exists({ _id: deptId, university: uniOf(req) }))) throw new ApiError(404, 'Department not found');
 
@@ -132,7 +142,7 @@ exports.getDepartmentRequests = asyncHandler(async (req, res) => {
     items: { $elemMatch: itemFilter },
   })
     .populate('student', 'name email regNo faculty phone avatarUrl')
-    .populate('items.department', 'name code order')
+    .populate('items.department', 'name code order faculty')
     .sort('-createdAt')
     .limit(500)
     .lean();
@@ -174,7 +184,7 @@ exports.actionItem = asyncHandler(async (req, res) => {
     throw new ApiError(403, 'You can only act on your own department');
   }
 
-  const request = await ClearanceRequest.findOne({ _id: id, university: uniOf(req) }).populate('student', 'name email regNo avatarUrl');
+  const request = await ClearanceRequest.findOne({ _id: id, university: uniOf(req), ...facultyScope(req, 'faculty') }).populate('student', 'name email regNo avatarUrl');
   if (!request) throw new ApiError(404, 'Request not found');
   if (request.status === 'cancelled') throw new ApiError(400, 'This request was cancelled');
   if (request.status === 'completed') throw new ApiError(400, 'This request is already completed and its certificate issued');

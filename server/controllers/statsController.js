@@ -7,7 +7,8 @@ const University = require('../models/University');
 const Certificate = require('../models/Certificate');
 const AuditLog = require('../models/AuditLog');
 const { asyncHandler, ApiError } = require('../middleware/error');
-const { uniOf } = require('../middleware/auth');
+const { uniOf, facultyScope } = require('../middleware/auth');
+const Faculty = require('../models/Faculty');
 
 const TZ = process.env.APP_TIMEZONE || 'Asia/Colombo';
 const oid = (v) => new mongoose.Types.ObjectId(String(v?._id || v));
@@ -21,7 +22,7 @@ const toMap = (rows) => Object.fromEntries(rows.map((r) => [r._id, r.n]));
 
 // The department an officer works for (admins may look at any department of their university)
 const deptFor = async (req) => {
-  const id = req.user.role === 'admin' ? req.query.department : req.user.department?._id;
+  const id = ['admin', 'facultyadmin'].includes(req.user.role) ? req.query.department : req.user.department?._id;
   if (!id) throw new ApiError(400, 'No department assigned to this account');
   const dept = await Department.findOne({ _id: id, university: uniOf(req) }).lean();
   if (!dept) throw new ApiError(404, 'Department not found');
@@ -130,14 +131,16 @@ exports.officerActivity = asyncHandler(async (req, res) => {
 ------------------------------------------------------------------- */
 exports.platformOverview = asyncHandler(async (req, res) => {
   const since30 = new Date(Date.now() - 30 * DAY);
-  const [unis, roleAgg, reqAgg, certs, series, recent] = await Promise.all([
+  const [unis, roleAgg, reqAgg, certs, series, recent, facAgg] = await Promise.all([
     University.find().sort('name').lean(),
     User.aggregate([{ $group: { _id: { u: '$university', role: '$role' }, n: { $sum: 1 } } }]),
     ClearanceRequest.aggregate([{ $group: { _id: { u: '$university', st: '$status' }, n: { $sum: 1 } } }]),
     Certificate.aggregate([{ $group: { _id: '$university', n: { $sum: 1 } } }]),
     ClearanceRequest.aggregate([{ $match: { createdAt: { $gte: since30 } } }, { $group: { _id: dayExpr('$createdAt'), n: { $sum: 1 } } }]),
     AuditLog.find().sort('-createdAt').limit(10).populate('actor', 'name role avatarUrl').populate('university', 'name code').lean(),
+    Faculty.aggregate([{ $group: { _id: '$university', n: { $sum: 1 } } }]),
   ]);
+  const facultiesOf = (u) => facAgg.filter((f) => u === null || String(f._id) === String(u)).reduce((sum, f) => sum + f.n, 0);
 
   const roles = (u, role) => roleAgg.filter((r) => (u === null || String(r._id.u) === String(u)) && r._id.role === role).reduce((s, r) => s + r.n, 0);
   const reqs = (u, st) => reqAgg.filter((r) => (u === null || String(r._id.u) === String(u)) && (!st || r._id.st === st)).reduce((s, r) => s + r.n, 0);
@@ -150,6 +153,8 @@ exports.platformOverview = asyncHandler(async (req, res) => {
       students: roles(null, 'student'),
       officers: roles(null, 'officer'),
       admins: roles(null, 'admin'),
+      facultyAdmins: roles(null, 'facultyadmin'),
+      faculties: facultiesOf(null),
       requests: reqs(null),
       completed: reqs(null, 'completed'),
       active: reqs(null, 'pending') + reqs(null, 'in-progress'),
@@ -164,7 +169,8 @@ exports.platformOverview = asyncHandler(async (req, res) => {
         logoUrl: u.logoUrl,
         isActive: u.isActive,
         students: roles(u._id, 'student'),
-        staff: roles(u._id, 'officer') + roles(u._id, 'admin'),
+        staff: roles(u._id, 'officer') + roles(u._id, 'admin') + roles(u._id, 'facultyadmin'),
+        faculties: facultiesOf(u._id),
         requests: reqs(u._id),
         completed: reqs(u._id, 'completed'),
       }))
@@ -213,10 +219,10 @@ exports.badges = asyncHandler(async (req, res) => {
     ]);
     out.pending = pending;
     out.receipts = receipts;
-  } else if (u.role === 'admin') {
+  } else if (u.role === 'admin' || u.role === 'facultyadmin') {
     const [active, notRegistered] = await Promise.all([
-      ClearanceRequest.countDocuments({ university: uniOf(req), status: { $in: ['pending', 'in-progress'] } }),
-      EnrolledStudent.countDocuments({ university: uniOf(req), status: 'pending' }),
+      ClearanceRequest.countDocuments({ university: uniOf(req), ...facultyScope(req, 'faculty'), status: { $in: ['pending', 'in-progress'] } }),
+      EnrolledStudent.countDocuments({ university: uniOf(req), ...facultyScope(req, 'facultyId'), status: 'pending' }),
     ]);
     out.active = active;
     out.notRegistered = notRegistered;

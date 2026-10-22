@@ -4,7 +4,12 @@ const { protect, authorize } = require('../middleware/auth');
 const uni = require('../controllers/universityController');
 const { logoUpload } = require('../middleware/upload');
 
-router.use(protect, authorize('admin'));
+// University admins and faculty admins (a faculty admin only ever sees their own faculty)
+router.use(protect, authorize('admin', 'facultyadmin'));
+router.get('/faculties', c.listFaculties);
+router.post('/faculties', authorize('admin'), c.createFaculty);
+router.patch('/faculties/:id', authorize('admin'), c.updateFaculty);
+router.delete('/faculties/:id', authorize('admin'), c.deleteFaculty);
 router.get('/users', c.listUsers);
 router.post('/users', c.createUser);
 router.get('/users/:id/summary', c.userSummary);
@@ -21,7 +26,7 @@ router.patch('/roster/:id', c.updateRosterEntry);
 router.delete('/roster/:id', c.deleteRosterEntry);
 
 // Their own university's logo
-router.post('/logo', logoUpload.single('logo'), uni.uploadLogo);
-router.delete('/logo', uni.removeLogo);
+router.post('/logo', authorize('admin'), logoUpload.single('logo'), uni.uploadLogo);
+router.delete('/logo', authorize('admin'), uni.removeLogo);
 
 module.exports = router;
