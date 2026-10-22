@@ -2,9 +2,9 @@
 
 EC4307 – Web Application Development · MERN stack (MongoDB, Express, React, Node.js)
 
-Students submit **one online clearance request**. Every department (Library, Hostel, Finance, Labs, Sports, Student Affairs) reviews it in parallel, records dues when something is owed, verifies uploaded payment receipts, and clears the student. When the last department clears them, a **PDF certificate with a QR code** is issued automatically, and anyone can verify it on a public page.
+Students submit **one online clearance request**. Their own faculty's offices (faculty office, head of department, laboratories, faculty library) and the university's central offices (main library, finance, hostels, sports, student affairs) review it in parallel, record dues when something is owed, verify uploaded payment receipts, and clear the student. When the last office clears them, a **PDF certificate with a QR code** is issued automatically, and anyone can verify it on a public page.
 
-One platform serves **all 17 Sri Lankan state universities**: a user's university email decides which university portal they enter, and every university only ever sees its own data.
+One platform serves **all 17 Sri Lankan state universities and their 125 faculties**. Signing in is **university → faculty → log in**: each faculty has its own portal, offices, officers and faculty admin (for example, Ruhuna's Faculty of Engineering in Galle is run separately from the Matara campus), and every university only ever sees its own data.
 
 ---
 
@@ -14,9 +14,10 @@ One platform serves **all 17 Sri Lankan state universities**: a user's universit
 | --- | --- |
 | **Student** | Overview (progress, next steps, recent updates) · Clearance request (submit, live department tracker, history) · Dues & payments (upload receipts) · Certificate (preview, PDF download, QR, share link) |
 | **Department officer** | Overview (workload, 14-day chart, money collected, average turnaround, oldest requests, recent activity) · Clearance requests (filter, search, sort, side panel, bulk clear, CSV export) · Receipts to verify · Dues register (add dues with live student check, settle, waive, export) · Activity history |
-| **University admin** | Overview (KPIs and charts) · All requests (filters, full history drawer, admin override, CSV) · Reports (faculty, reason, dues by department, print / CSV) · Official student list (CSV import) · Users & staff · Departments · Audit log |
-| **Platform admin** | Overview of all universities · Universities (domains, logos, first admin) · Platform audit log |
-| **Everyone** | Landing page, choose-your-university page with a separate portal per university, verified registration (student list + university email + 6-digit code), login with "keep me signed in", forgot / reset password, certificate verification, help centre, notifications bell, account settings with profile picture upload, dark mode |
+| **University admin** | Overview (KPIs and charts, filter by faculty) · **Faculties** (add / edit / deactivate, faculty admins, portal address) · All requests (faculty filter, full history drawer, admin override, CSV) · Reports (by faculty, reason, dues by office, print / CSV) · Official student list (by faculty, CSV import) · Users & staff · Offices (central and faculty) · Audit log |
+| **Faculty admin** | The same pages limited to their own faculty: its students, officers, offices, requests, reports and audit log (central offices are read-only) |
+| **Platform admin** | Overview of all universities · Universities (domains, logos, faculties, first admin) · Platform audit log |
+| **Everyone** | Landing page, choose your university then your faculty (or Central administration), a separate portal per faculty, verified registration (student list + university email + 6-digit code), login with "keep me signed in", forgot / reset password, certificate verification, help centre, notifications bell, account settings with profile picture upload, dark mode |
 
 **University logos:** put each university's official logo in `server/data/logos/<portal>.png` (e.g. `ruhuna.png`, list in that folder's README). They appear on the portals, sidebar, certificates and verify page after a server restart, seed or reset. The platform admin (Universities) or each university admin (Account settings) can also upload a logo in the app (PNG, JPG, WebP or SVG, up to 1 MB).
 
@@ -70,22 +71,28 @@ npm run dev      # opens http://localhost:5173
 `client/.env` should contain `VITE_API_URL=http://localhost:5000`.
 
 ### 3d. Demo accounts (password for all: `password123`)
-**Signing in:** press **Log in** → choose the university (each university has its own portal, e.g. `/portal/ruhuna`) → log in or create an account there. The platform admin uses **Platform administrator sign-in** at the bottom of the university list (`/platform-login`). Each university has its own admin, created by the platform admin under **Universities**.
+**Signing in:** press **Log in** → choose the university → choose the **faculty** (e.g. `/portal/ruhuna/engineering`) or **Central administration** (`/portal/ruhuna/central`) → log in or create an account there. Students, faculty officers and faculty admins use their faculty; the university admin and central office officers use Central administration. A wrong door is refused with a link to the right one. The platform admin uses **Platform administrator sign-in** at the bottom of the university list (`/platform-login`).
 
-| Who | Email | What you'll see |
-| --- | --- | --- |
-| Student | `demo.kasun@ruh.ac.lk` | Request in progress, LKR 450 library fine |
-| Student | `demo.nimali@ruh.ac.lk` | Fully cleared, certificate ready |
-| Student | `demo.tharindu@ruh.ac.lk` | No request yet – use him to show submitting one |
-| Library officer | `demo.lib@ruh.ac.lk` | Busy department desk (also `demo.hos@`, `demo.fin@`, `demo.lab@`, `demo.spo@`, `demo.saf@ruh.ac.lk`) |
-| University admin | `demo.admin@ruh.ac.lk` | ~48 students, 40 requests, charts, audit log |
-| Another university | `demo.saman@cmb.ac.lk`, `demo.admin@cmb.ac.lk` | University of Colombo portal (separate data) |
-| Platform admin | `platform@clearpath.lk` | All universities |
-| Register a new student | Reg. no `EG/2021/4519` + `demo.amal@ruh.ac.lk` | The 6-digit code is shown on screen (no email set up) |
+**Who creates whom:** platform admin → each university's admin (Universities page) → faculties and faculty admins (Faculties page) → offices and officers (Offices, Users & staff) → the official student list. Students then create their own accounts.
+
+| Where | Who | Email | What you'll see |
+| --- | --- | --- | --- |
+| Ruhuna · Engineering | Student | `demo.kasun@ruh.ac.lk` | Request in progress, 5 of 9 offices cleared, LKR 450 fine at the Engineering Faculty Library |
+| Ruhuna · Engineering | Student | `demo.nimali@ruh.ac.lk` | Fully cleared, certificate ready |
+| Ruhuna · Engineering | Student | `demo.tharindu@ruh.ac.lk` | No request yet – use him to show submitting one |
+| Ruhuna · Engineering | Faculty admin | `demo.eng.admin@ruh.ac.lk` | Only Engineering: its students, officers, offices, reports |
+| Ruhuna · Engineering | Faculty officers | `demo.eng.flib@`, `demo.eng.lab@`, `demo.eng.hod@`, `demo.eng.office@ruh.ac.lk` | Faculty library (Galle), labs, head of department, faculty office |
+| Ruhuna · Science | Student / faculty admin | `demo.hiruni@ruh.ac.lk`, `demo.sci.admin@ruh.ac.lk` | A different faculty with its own offices |
+| Ruhuna · Central administration | University admin | `demo.admin@ruh.ac.lk` | Whole university, all faculties, Faculties page |
+| Ruhuna · Central administration | Central officers | `demo.lib@`, `demo.fin@`, `demo.hos@`, `demo.spo@`, `demo.saf@ruh.ac.lk` | Main library, finance, hostels, sports, student affairs – students of every faculty |
+| Colombo · Science | Student | `demo.saman@cmb.ac.lk` (admin `demo.admin@cmb.ac.lk`) | University of Colombo (separate data) |
+| Any university | Same pattern | `demo.admin@<domain>`, `demo.<faculty code>.admin@<domain>` … | All 17 universities have faculties, offices, staff and students |
+| Platform | Platform admin | `platform@clearpath.lk` | All universities |
+| Ruhuna · Engineering | Register a new student | Reg. no `EG/2021/4519` + `demo.amal@ruh.ac.lk` | Create account on the Engineering portal (code on screen when no email is set up) |
 
 `npm run seed` wipes the database each time.
 
-**Fresh start without demo data:** `npm run reset -- --yes` (in `server`) deletes everything and keeps only the 17 universities and a platform admin (a strong password is printed; or add `--email you@x.com --password "YourPass123"`). Add `--empty` to leave the database completely empty. `npm run seed` brings the demo data back. While `npm run dev` runs, the login page has a **Demo access** panel that fills these in.
+**Fresh start without demo data:** `npm run reset -- --yes` (in `server`) deletes everything and keeps only the 17 universities with their faculties and a platform admin (a strong password is printed; or add `--email you@x.com --password "YourPass123"`). Add `--empty` to leave the database completely empty. `npm run seed` brings the demo data back. While `npm run dev` runs, the login page has a **Demo access** panel that fills these in.
 
 ---
 
@@ -150,11 +157,11 @@ Run `npm run seed` first so the demo data is fresh. Password for every account: 
 | Time | Show | Rubric point |
 | --- | --- | --- |
 | 0:00–0:25 | Camera on: name, index number, the problem (paper form, six offices) and the MERN stack. | – |
-| 0:25–1:00 | Home → **Log in** → choose **University of Ruhuna** → log in as `demo.tharindu@ruh.ac.lk`. Submit a request (**Create**), then **Edit request** to change the note (**Update**). | Create, Update |
-| 1:00–2:00 | `demo.lib@ruh.ac.lk` → **Clearance requests**: search, filter, sort, open a request in the side panel (**Read**). **Dues register**: add a due with reg. no. `EG/2021/4510` (watch the live name check); try amount `0` → error; edit the amount; delete it. | Read, Create, Update, Delete, Validation |
-| 2:00–2:45 | `demo.kasun@ruh.ac.lk` → **Dues & payments** → upload any image as the receipt. Back as the librarian → **Receipts to verify** → approve → Kasun returns to Pending → **Clear**. | Workflow, business rules |
-| 2:45–3:40 | `demo.admin@ruh.ac.lk` → **Official student list**: add a student, edit it, delete it; sort by name. **Departments**: try deleting Library → refused. **Reports** and **Audit log** (every action you just did is listed). | Full CRUD, data integrity |
-| 3:40–4:15 | `demo.nimali@ruh.ac.lk` → **Certificate** → download PDF → open the verify link → valid. Log out, open the **Colombo** portal, try Kasun's account → refused (separate universities). | Security, multi-tenancy |
+| 0:25–1:00 | Home → **Log in** → **University of Ruhuna** → **Faculty of Engineering** → log in as `demo.tharindu@ruh.ac.lk`. Submit a request (**Create**): it goes to the Engineering offices plus the central offices. Then **Edit request** (**Update**). | Create, Update |
+| 1:00–2:00 | `demo.eng.flib@ruh.ac.lk` (Engineering Faculty Library) → **Clearance requests**: search, filter, sort, side panel (**Read**). **Dues register**: add a due for `EG/2021/4510` (live name check); try amount `0` → error; edit the amount; delete it. | Read, Create, Update, Delete, Validation |
+| 2:00–2:45 | `demo.kasun@ruh.ac.lk` → **Dues & payments** → upload any image as the receipt for the LKR 450 fine. Back as the faculty librarian → **Receipts to verify** → approve → Kasun returns to Pending → **Clear**. | Workflow, business rules |
+| 2:45–3:40 | **Central administration** → `demo.admin@ruh.ac.lk` → **Faculties** (10 faculties, each with its own admin and portal) → **Official student list**: add, edit, delete a student; sort. **Offices**: try deleting Main Library → refused. **Reports** filtered by faculty, **Audit log**. | Full CRUD, data integrity |
+| 3:40–4:15 | `demo.nimali@ruh.ac.lk` → **Certificate** → download PDF → verify link → valid. Try Kasun on the **Science** portal → refused with a link to Engineering; try him on **Colombo** → refused (separate universities). | Security, multi-tenancy |
 | 4:15–4:40 | Browser device toolbar (phone width) and dark mode. | UI/UX, responsive |
 | 4:40–5:00 | GitHub repository: commit history, README with ERD and screenshots. | Code quality, documentation |
 
@@ -189,11 +196,16 @@ clearpath/
 
 ## 7. Database design (ERD)
 
-Every record belongs to one university (`university` reference), so each university only sees its own data. A clearance request embeds one item per department; dues live in their own collection because they have their own life cycle and receipts.
+Every record belongs to one university (`university` reference), so each university only sees its own data. Students, faculty staff, requests and dues also carry their **faculty**, so a faculty admin only sees their own faculty; offices without a faculty are the university's central offices. A clearance request embeds one item per department; dues live in their own collection because they have their own life cycle and receipts.
 
 ```mermaid
 erDiagram
-    UNIVERSITY ||--o{ DEPARTMENT : has
+    UNIVERSITY ||--o{ FACULTY : has
+    UNIVERSITY ||--o{ DEPARTMENT : "central offices"
+    FACULTY |o--o{ DEPARTMENT : "faculty offices"
+    FACULTY ||--o{ USER : "students, faculty staff"
+    FACULTY ||--o{ ENROLLED_STUDENT : lists
+    FACULTY ||--o{ CLEARANCE_REQUEST : "student's faculty"
     UNIVERSITY ||--o{ USER : has
     UNIVERSITY ||--o{ ENROLLED_STUDENT : "official list"
     ENROLLED_STUDENT |o--o| USER : "activates"
@@ -217,9 +229,19 @@ erDiagram
         string logoUrl
         bool isActive
     }
+    FACULTY {
+        ObjectId _id PK
+        ObjectId university FK
+        string name
+        string code
+        string slug "portal address"
+        string location
+        bool isActive
+    }
     DEPARTMENT {
         ObjectId _id PK
         ObjectId university FK
+        ObjectId faculty FK "empty = central office"
         string name
         string code
         number order
@@ -229,7 +251,8 @@ erDiagram
         ObjectId _id PK
         string email UK
         string password "bcrypt hash"
-        string role "student|officer|admin|superadmin"
+        string role "student|officer|facultyadmin|admin|superadmin"
+        ObjectId facultyId FK
         ObjectId university FK
         ObjectId department FK
         string regNo
@@ -291,7 +314,7 @@ erDiagram
     }
 ```
 
-Unique rules: department `(university, code)` and `(university, name)`; student list `(university, regNo)`; user `email` and `(university, regNo)`. Indexes back the busiest queries (officer queue on `items.department + items.status`, dues by student/department, notifications by user).
+Unique rules: faculty `(university, slug)` and `(university, code)`; office `(university, faculty, code)` and `(university, faculty, name)`; student list `(university, regNo)`; user `email` and `(university, regNo)`. Indexes back the busiest queries (officer queue on `items.department + items.status`, dues by student/department, notifications by user).
 
 ## 8. REST API (all under `/api`)
 | Area | Endpoints |
@@ -302,9 +325,10 @@ Unique rules: department `(university, code)` and `(university, name)`; student 
 | Certificates | `GET /certificates/:requestId/pdf`, `GET /verify/:no` (public), `GET /verify/:no/qr.png` (public) |
 | Dashboards | `GET /stats/badges`, `GET /stats/officer`, `GET /stats/officer/activity` |
 | Notifications | `GET /notifications`, `PATCH /notifications/read-all`, `PATCH /notifications/:id/read`, `DELETE /notifications` |
+| Faculties | `GET/POST /admin/faculties`, `PATCH/DELETE /admin/faculties/:id` (university admin; faculty admins read their own) |
 | Admin | `GET/POST/PATCH/DELETE /admin/users`, `GET /admin/users/:id/summary`, `GET /admin/requests`, `GET /admin/requests/:id`, `GET /admin/reports`, `GET /admin/audit`, roster `GET/POST /admin/roster`, `POST /admin/roster/import`, `PATCH/DELETE /admin/roster/:id`, departments `GET/POST/PATCH/DELETE /departments` |
 | Platform | `GET /platform/overview`, `GET /platform/audit`, `GET/POST/PATCH /platform/universities`, logos, admins |
-| Public | `GET /universities`, `GET /universities/lookup?email=`, `GET /files/:key`, `GET /health` |
+| Public | `GET /universities`, `GET /universities/:portal` (with its faculties), `GET /universities/:portal/:faculty` (or `central`), `GET /universities/lookup?email=`, `GET /files/:key`, `GET /health` |
 
 ## 9. Design system
 60-30-10 colour rule: 60% neutral surfaces, 30% ink, 10% one brand colour (indigo `#4f46e5`) for primary actions, links, focus and active states. Green, amber and red only ever mean cleared/paid, dues and unpaid/error. System fonts (San Francisco / Segoe UI / Roboto). Light and dark themes. All tokens are CSS variables in `client/src/styles.css`; the app shell lives in `client/src/app.css`.
