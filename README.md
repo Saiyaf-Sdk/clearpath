@@ -150,24 +150,7 @@ Deploy `server` as a Render web service (root directory `server`, start `npm sta
 
 ---
 
-## 5. Demonstration script (5 minutes)
-
-Run `npm run seed` first so the demo data is fresh. Password for every account: `password123`.
-
-| Time | Show | Rubric point |
-| --- | --- | --- |
-| 0:00–0:25 | Camera on: name, index number, the problem (paper form, six offices) and the MERN stack. | – |
-| 0:25–1:00 | Home → **Log in** → **University of Ruhuna** → **Faculty of Engineering** → log in as `demo.tharindu@ruh.ac.lk`. Submit a request (**Create**): it goes to the Engineering offices plus the central offices. Then **Edit request** (**Update**). | Create, Update |
-| 1:00–2:00 | `demo.eng.flib@ruh.ac.lk` (Engineering Faculty Library) → **Clearance requests**: search, filter, sort, side panel (**Read**). **Dues register**: add a due for `EG/2021/4510` (live name check); try amount `0` → error; edit the amount; delete it. | Read, Create, Update, Delete, Validation |
-| 2:00–2:45 | `demo.kasun@ruh.ac.lk` → **Dues & payments** → upload any image as the receipt for the LKR 450 fine. Back as the faculty librarian → **Receipts to verify** → approve → Kasun returns to Pending → **Clear**. | Workflow, business rules |
-| 2:45–3:40 | **Central administration** → `demo.admin@ruh.ac.lk` → **Faculties** (10 faculties, each with its own admin and portal) → **Official student list**: add, edit, delete a student; sort. **Offices**: try deleting Main Library → refused. **Reports** filtered by faculty, **Audit log**. | Full CRUD, data integrity |
-| 3:40–4:15 | `demo.nimali@ruh.ac.lk` → **Certificate** → download PDF → verify link → valid. Try Kasun on the **Science** portal → refused with a link to Engineering; try him on **Colombo** → refused (separate universities). | Security, multi-tenancy |
-| 4:15–4:40 | Browser device toolbar (phone width) and dark mode. | UI/UX, responsive |
-| 4:40–5:00 | GitHub repository: commit history, README with ERD and screenshots. | Code quality, documentation |
-
----
-
-## 6. Project structure
+## 5. Project structure
 ```
 clearpath/
 ├── package.json            root scripts: build (installs + builds the app), start, seed
@@ -194,7 +177,7 @@ clearpath/
         └── pages/          public pages, student/, officer/, admin/, platform/, account/
 ```
 
-## 7. Database design (ERD)
+## 6. Database design (ERD)
 
 Every record belongs to one university (`university` reference), so each university only sees its own data. Students, faculty staff, requests and dues also carry their **faculty**, so a faculty admin only sees their own faculty; offices without a faculty are the university's central offices. A clearance request embeds one item per department; dues live in their own collection because they have their own life cycle and receipts.
 
@@ -316,7 +299,7 @@ erDiagram
 
 Unique rules: faculty `(university, slug)` and `(university, code)`; office `(university, faculty, code)` and `(university, faculty, name)`; student list `(university, regNo)`; user `email` and `(university, regNo)`. Indexes back the busiest queries (officer queue on `items.department + items.status`, dues by student/department, notifications by user).
 
-## 8. REST API (all under `/api`)
+## 7. REST API (all under `/api`)
 | Area | Endpoints |
 | --- | --- |
 | Auth | `POST /auth/register/start · /register/verify · /register/complete · /login · /forgot-password`, `GET/POST /auth/reset-password/:token`, `GET/PATCH /auth/me`, `PATCH /auth/password` |
@@ -330,10 +313,10 @@ Unique rules: faculty `(university, slug)` and `(university, code)`; office `(un
 | Platform | `GET /platform/overview`, `GET /platform/audit`, `GET/POST/PATCH /platform/universities`, logos, admins |
 | Public | `GET /universities`, `GET /universities/:portal` (with its faculties), `GET /universities/:portal/:faculty` (or `central`), `GET /universities/lookup?email=`, `GET /files/:key`, `GET /health` |
 
-## 9. Design system
+## 8. Design system
 60-30-10 colour rule: 60% neutral surfaces, 30% ink, 10% one brand colour (indigo `#4f46e5`) for primary actions, links, focus and active states. Green, amber and red only ever mean cleared/paid, dues and unpaid/error. System fonts (San Francisco / Segoe UI / Roboto). Light and dark themes. All tokens are CSS variables in `client/src/styles.css`; the app shell lives in `client/src/app.css`.
 
-## 10. Troubleshooting
+## 9. Troubleshooting
 | Problem | Fix |
 | --- | --- |
 | `MongoDB connection error` / `bad auth` | Check `MONGO_URI` and the password, and that Atlas Network Access allows `0.0.0.0/0`. |
