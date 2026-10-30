@@ -35,6 +35,9 @@ const clearanceRequestSchema = new mongoose.Schema(
 );
 
 clearanceRequestSchema.index({ 'items.department': 1, 'items.status': 1 });
+clearanceRequestSchema.index({ student: 1, status: 1 });
+clearanceRequestSchema.index({ university: 1, status: 1, createdAt: -1 });
+clearanceRequestSchema.index({ university: 1, faculty: 1, status: 1 });
 
 // Recalculate overall status from the department items
 clearanceRequestSchema.methods.refreshStatus = function refreshStatus() {

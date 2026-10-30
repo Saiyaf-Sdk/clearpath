@@ -7,6 +7,10 @@ export const API_URL = (import.meta.env.VITE_API_URL ?? fallback).replace(/\/$/,
 
 const api = axios.create({ baseURL: `${API_URL}/api`, timeout: 30000 });
 
+/* ---------- In-memory client cache for static public routes ---------- */
+const clientCache = new Map();
+const CACHED_ROUTES = ['/universities'];
+
 export const getToken = () => {
   try {
     return localStorage.getItem('cp_token') || sessionStorage.getItem('cp_token');
@@ -26,16 +30,33 @@ export const clearSession = () => {
   }
 };
 
-// Attach the JWT to every request
+// Attach the JWT and serve cached public endpoints instantly
 api.interceptors.request.use((config) => {
   const token = getToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (config.method === 'get' && CACHED_ROUTES.some((r) => config.url === r || config.url?.startsWith('/universities/'))) {
+    const cached = clientCache.get(config.url);
+    if (cached && Date.now() - cached.at < 180000) {
+      config.adapter = () => Promise.resolve({
+        data: cached.data,
+        status: 200,
+        statusText: 'OK',
+        headers: { 'x-cache': 'hit' },
+        config,
+      });
+    }
+  }
   return config;
 });
 
-// An expired or invalid session: clear it and let the app send the user to the login page
+// Cache successful responses for public static data
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    if (res.config?.method === 'get' && CACHED_ROUTES.some((r) => res.config.url === r || res.config.url?.startsWith('/universities/'))) {
+      clientCache.set(res.config.url, { data: res.data, at: Date.now() });
+    }
+    return res;
+  },
   (err) => {
     const status = err.response?.status;
     const isLogin = err.config?.url?.startsWith('/auth/login');

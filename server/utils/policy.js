@@ -17,7 +17,7 @@ const candidates = (domain) => {
 const universityForEmail = async (email) => {
   const domain = domainOf(email);
   if (!domain) return null;
-  return University.findOne({ domains: { $in: candidates(domain) }, isActive: true });
+  return University.findOne({ domains: { $in: candidates(domain) }, isActive: true }).lean();
 };
 
 const emailBelongsTo = (email, university) => {
@@ -32,10 +32,15 @@ const publicUniversity = (u) =>
 
 // The university whose portal is open: matched by portal address (slug) or code, e.g. "ruhuna" or "UOR"
 const RESERVED = ['platform', 'admin', 'login', 'register'];
+const portalUniCache = new Map();
 const universityForPortal = async (portal) => {
   const v = String(portal || '').toLowerCase().trim();
   if (!v || RESERVED.includes(v)) return null;
-  return University.findOne({ $or: [{ slug: v }, { code: v.toUpperCase() }] });
+  const cached = portalUniCache.get(v);
+  if (cached && Date.now() - cached.at < 300000) return cached.val;
+  const uni = await University.findOne({ $or: [{ slug: v }, { code: v.toUpperCase() }] }).lean();
+  if (uni) portalUniCache.set(v, { val: uni, at: Date.now() });
+  return uni;
 };
 
 // Faculty portals: /portal/<university>/<faculty>. "central" is the university's central administration
@@ -48,7 +53,7 @@ const facultyForPortal = async (universityId, slug) => {
   const v = String(slug || '').toLowerCase().trim();
   if (!v) return null;
   if (v === CENTRAL) return { central: true, faculty: null };
-  const faculty = await Faculty.findOne({ university: universityId, slug: v, isActive: true });
+  const faculty = await Faculty.findOne({ university: universityId, slug: v, isActive: true }).lean();
   return faculty ? { central: false, faculty } : null;
 };
 

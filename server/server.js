@@ -2,6 +2,7 @@ require('dotenv').config();
 const path = require('path');
 const fs = require('fs');
 const express = require('express');
+const compression = require('compression');
 const cors = require('cors');
 const helmet = require('helmet');
 const mongoose = require('mongoose');
@@ -24,6 +25,7 @@ if (isProd && (process.env.JWT_SECRET.length < 24 || /change_this/i.test(process
 
 const app = express();
 app.disable('x-powered-by');
+app.use(compression());
 // Render, Railway, Heroku etc. sit behind a proxy: needed for correct client IPs (rate limiting) and https URLs
 app.set('trust proxy', 1);
 
@@ -145,10 +147,11 @@ app.use(errorHandler);
 /* ---------- Start ---------- */
 const PORT = process.env.PORT || 5000;
 let server;
-connectDB().then(async () => {
-  await require('./utils/bootstrap')();
+connectDB().then(() => {
   server = app.listen(PORT, () => {
     console.log(`ClearPath API running on port ${PORT}${serveClient ? ' (also serving the web app)' : ''}`);
+    // Run background bootstrap asynchronously without blocking HTTP readiness
+    require('./utils/bootstrap')().catch((err) => console.error('Bootstrap error:', err.message));
   });
 });
 

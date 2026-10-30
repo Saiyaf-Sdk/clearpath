@@ -12,12 +12,31 @@ const { uniOf } = require('../middleware/auth');
 // Platform admin works on /platform/universities/:id; a university admin only on their own university
 const logoTarget = (req) => (req.user.role === 'superadmin' ? req.params.id : uniOf(req));
 
+/* ---------- In-memory caching for public university/faculty data ---------- */
+let publicUnisCache = null;
+let publicUnisCacheAt = 0;
+const portalCache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+const clearPublicCache = () => {
+  publicUnisCache = null;
+  publicUnisCacheAt = 0;
+  portalCache.clear();
+};
+
 /* ---------- Public ---------- */
 
 // GET /api/universities  – active universities (names + logos) for the home page
 exports.listPublic = asyncHandler(async (req, res) => {
-  const list = await University.find({ isActive: true }).sort('name');
-  res.json(list.map(publicUniversity));
+  res.set('Cache-Control', 'public, max-age=180, stale-while-revalidate=600');
+  const now = Date.now();
+  if (publicUnisCache && now - publicUnisCacheAt < CACHE_TTL) {
+    return res.json(publicUnisCache);
+  }
+  const list = await University.find({ isActive: true }).sort('name').lean();
+  publicUnisCache = list.map(publicUniversity);
+  publicUnisCacheAt = now;
+  res.json(publicUnisCache);
 });
 
 // GET /api/universities/lookup?email=name@ruh.ac.lk  – which university portal an email belongs to
@@ -29,15 +48,24 @@ exports.lookup = asyncHandler(async (req, res) => {
 
 // GET /api/universities/:portal  – one university's portal details (logo, name, email domains)
 exports.getPortal = asyncHandler(async (req, res) => {
+  res.set('Cache-Control', 'public, max-age=180, stale-while-revalidate=600');
+  const portalKey = String(req.params.portal || '').toLowerCase();
+  const cached = portalCache.get(portalKey);
+  if (cached && Date.now() - cached.at < CACHE_TTL) {
+    return res.json(cached.data);
+  }
   const university = await universityForPortal(req.params.portal);
   if (!university) throw new ApiError(404, 'We could not find this university portal');
   if (!university.isActive) throw new ApiError(403, `${university.name} is not active on ClearPath yet`);
-  const faculties = await Faculty.find({ university: university._id, isActive: true }).sort('order name');
-  res.json({ ...publicUniversity(university), faculties: faculties.map(publicFaculty) });
+  const faculties = await Faculty.find({ university: university._id, isActive: true }).sort('order name').lean();
+  const data = { ...publicUniversity(university), faculties: faculties.map(publicFaculty) };
+  portalCache.set(portalKey, { data, at: Date.now() });
+  res.json(data);
 });
 
 // GET /api/universities/:portal/:faculty  – one faculty portal (or "central" for Central administration)
 exports.getFacultyPortal = asyncHandler(async (req, res) => {
+  res.set('Cache-Control', 'public, max-age=180, stale-while-revalidate=600');
   const university = await universityForPortal(req.params.portal);
   if (!university) throw new ApiError(404, 'We could not find this university portal');
   if (!university.isActive) throw new ApiError(403, `${university.name} is not active on ClearPath yet`);
@@ -94,6 +122,7 @@ exports.create = asyncHandler(async (req, res) => {
   if (!data.domains?.length) throw new ApiError(400, 'Add at least one email domain (e.g. ruh.ac.lk)');
   await checkDomains(data.domains);
   const uni = await University.create(data);
+  clearPublicCache();
   await audit(req.user, 'UNIVERSITY_CREATED', uni._id, uni.name);
   res.status(201).json(uni);
 });
@@ -106,6 +135,7 @@ exports.update = asyncHandler(async (req, res) => {
   if (!uni) throw new ApiError(404, 'University not found');
   Object.assign(uni, data);
   await uni.save();
+  clearPublicCache();
   await audit(req.user, 'UNIVERSITY_UPDATED', uni._id, uni.name);
   res.json(uni);
 });
@@ -119,6 +149,7 @@ exports.uploadLogo = asyncHandler(async (req, res) => {
   await removeByUrl(uni.logoUrl);
   uni.logoUrl = url;
   await uni.save();
+  clearPublicCache();
   await audit(req.user, 'UNIVERSITY_LOGO_UPDATED', uni._id, uni.name);
   res.json(uni);
 });
@@ -133,6 +164,7 @@ exports.removeLogo = asyncHandler(async (req, res) => {
   const bundled = bundledFor(uni.slug);
   uni.logoUrl = bundled ? `${LOGO_PREFIX}${bundled}` : undefined;
   await uni.save();
+  clearPublicCache();
   await audit(req.user, 'UNIVERSITY_LOGO_REMOVED', uni._id, uni.name);
   res.json(uni);
 });

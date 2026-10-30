@@ -24,40 +24,40 @@ const linkByName = async (Model, filter, faculties) => {
   return n;
 };
 
-// Small, safe fixes run every time the server starts (idempotent).
-// - Gives every university a portal address (slug), e.g. databases seeded before portals existed.
-// - Gives universities without an uploaded logo their bundled logo (server/data/logos).
-// - Adds the faculties of universities that have none yet, and updates indexes (offices are unique per faculty).
+// Small, safe fixes run when needed.
+// - Gives every university a portal address (slug) if missing.
+// - Adds bundled logos and default faculties if missing.
 const bootstrap = async () => {
   try {
-    const missing = await University.find({ $or: [{ slug: { $exists: false } }, { slug: null }, { slug: '' }] });
-    for (const u of missing) {
-      const known = UNIVERSITIES.find((x) => x.code === u.code);
-      u.slug = known?.slug || u.code.toLowerCase();
-      await u.save(); // eslint-disable-line no-await-in-loop
-    }
-    if (missing.length) console.log(`Added portal addresses for ${missing.length} universities.`);
-    await Promise.all([University.syncIndexes(), Faculty.syncIndexes(), Department.syncIndexes()]);
-
-    // Faculties for universities that have none (databases from before faculty portals)
-    const unis = await University.find().select('slug').lean();
-    let added = 0;
-    for (const u of unis) {
-      if (!FACULTIES[u.slug] || (await Faculty.exists({ university: u._id }))) continue; // eslint-disable-line no-await-in-loop
-      await Faculty.insertMany(FACULTIES[u.slug].map((f, i) => ({ ...f, order: i, university: u._id }))); // eslint-disable-line no-await-in-loop
-      added += 1;
-    }
-    if (added) {
-      const faculties = await Faculty.find().lean();
-      const linked = (await linkByName(User, { role: 'student' }, faculties)) + (await linkByName(EnrolledStudent, {}, faculties));
-      console.log(`Added faculties for ${added} universities${linked ? ` and linked ${linked} students to their faculty` : ''}. Run "npm run seed" for the full faculty demo data.`);
+    const missing = await University.find({ $or: [{ slug: { $exists: false } }, { slug: null }, { slug: '' }] }).lean();
+    if (missing.length) {
+      for (const u of missing) {
+        const known = UNIVERSITIES.find((x) => x.code === u.code);
+        await University.updateOne({ _id: u._id }, { slug: known?.slug || u.code.toLowerCase() });
+      }
+      console.log(`Added portal addresses for ${missing.length} universities.`);
     }
 
-    // Requests and dues from before faculties take the student's faculty (so faculty admins see them)
-    for (const Model of [ClearanceRequest, Due]) {
-      const rows = await Model.find({ faculty: { $exists: false } }).select('student').populate('student', 'facultyId').lean(); // eslint-disable-line no-await-in-loop
-      const ops = rows.filter((r) => r.student?.facultyId).map((r) => ({ updateOne: { filter: { _id: r._id }, update: { faculty: r.student.facultyId } } }));
-      if (ops.length) await Model.bulkWrite(ops); // eslint-disable-line no-await-in-loop
+    // Only rebuild indexes if explicitly requested (e.g., during seed or manual migration)
+    if (process.env.SYNC_INDEXES === 'true') {
+      await Promise.all([University.syncIndexes(), Faculty.syncIndexes(), Department.syncIndexes()]);
+    }
+
+    // Quick check if faculties exist for universities that have none
+    const uniWithoutFaculty = await University.findOne().select('_id slug').lean();
+    if (uniWithoutFaculty && !(await Faculty.exists({ university: uniWithoutFaculty._id }))) {
+      const unis = await University.find().select('slug').lean();
+      let added = 0;
+      for (const u of unis) {
+        if (!FACULTIES[u.slug] || (await Faculty.exists({ university: u._id }))) continue;
+        await Faculty.insertMany(FACULTIES[u.slug].map((f, i) => ({ ...f, order: i, university: u._id })));
+        added += 1;
+      }
+      if (added) {
+        const faculties = await Faculty.find().lean();
+        const linked = (await linkByName(User, { role: 'student' }, faculties)) + (await linkByName(EnrolledStudent, {}, faculties));
+        console.log(`Added faculties for ${added} universities${linked ? ` and linked ${linked} students to their faculty` : ''}.`);
+      }
     }
 
     const logos = await applyBundledLogos();

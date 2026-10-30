@@ -2,10 +2,17 @@ const mongoose = require('mongoose');
 
 mongoose.set('strictQuery', true);
 
-// Connects to MongoDB, retrying a few times (Atlas can take a moment to accept a new connection)
+// Connects to MongoDB with optimized connection pooling
 const connectDB = async (attempt = 1) => {
   try {
-    const conn = await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 10000 });
+    const conn = await mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 7000,
+      minPoolSize: 2,        // Keep warm connections open to eliminate handshake delay
+      maxPoolSize: 10,       // Fit safely within Atlas M0 free-tier cluster limits
+      maxIdleTimeMS: 30000,  // Keep idle sockets warm
+      socketTimeoutMS: 30000,
+      connectTimeoutMS: 10000,
+    });
     console.log(`MongoDB connected: ${conn.connection.host}`);
     mongoose.connection.on('disconnected', () => console.warn('MongoDB disconnected – trying to reconnect…'));
     mongoose.connection.on('reconnected', () => console.log('MongoDB reconnected'));

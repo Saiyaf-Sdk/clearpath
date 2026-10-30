@@ -34,7 +34,7 @@ function useBootProgress(onDone) {
 
   useEffect(() => {
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const minTime = reduce ? 400 : 1750;
+    const minTime = reduce ? 150 : 450;
     const start = performance.now();
     let ready = false;
     let finishedAt = null;
@@ -46,18 +46,18 @@ function useBootProgress(onDone) {
       else window.addEventListener('load', resolve, { once: true });
     });
     Promise.all([pageLoaded, document.fonts?.ready ?? Promise.resolve()]).then(() => { ready = true; });
-    const safety = setTimeout(() => { ready = true; }, 4500);
+    const safety = setTimeout(() => { ready = true; }, 1500);
 
     const tick = (now) => {
       const t = now - start;
       const target = ready && t >= minTime ? 100 : Math.min(88, (t / minTime) * 88);
-      value += (target - value) * (target === 100 ? 0.14 : 0.07);
-      if (target === 100 && value > 99.6) value = 100;
+      value += (target - value) * (target === 100 ? 0.28 : 0.16);
+      if (target === 100 && value > 99) value = 100;
       setProgress(value);
 
       if (value === 100) {
         finishedAt = finishedAt ?? now;
-        if (now - finishedAt > 260) {
+        if (now - finishedAt > 120) {
           done.current();
           return;
         }

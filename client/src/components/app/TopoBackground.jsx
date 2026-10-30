@@ -64,12 +64,12 @@ function makeNoise(seed = 7) {
 }
 
 /* ---------- look ---------- */
-const CELL = 14; // grid size in CSS px used to trace the contours
+const CELL = 24; // optimized grid size to eliminate CPU lag
 const SCALE = 1 / 420; // size of the "hills"
 const SPEED = 0.0016; // how fast the terrain reshapes (per frame)
 const DRIFT = 0.12; // slow sideways drift of the whole map (px per frame)
-const LEVELS = 22; // contour lines between the lowest and highest ground
-const FPS = 20;
+const LEVELS = 14; // contour lines between the lowest and highest ground
+const FPS = 12; // buttery smooth drift without blocking UI thread
 
 const STYLE = {
   light: { line: 'rgba(79, 70, 229, 0.13)', index: 'rgba(79, 70, 229, 0.24)' },

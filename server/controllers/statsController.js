@@ -199,6 +199,7 @@ exports.platformAudit = asyncHandler(async (req, res) => {
    GET /api/stats/badges  – small counts for the sidebar and the bell (any signed-in user)
 ------------------------------------------------------------------- */
 exports.badges = asyncHandler(async (req, res) => {
+  res.set('Cache-Control', 'private, max-age=15');
   const Notification = require('../models/Notification');
   const EnrolledStudent = require('../models/EnrolledStudent');
   const u = req.user;

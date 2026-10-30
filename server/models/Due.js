@@ -24,4 +24,9 @@ const dueSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+dueSchema.index({ student: 1, department: 1, status: 1 });
+dueSchema.index({ student: 1, createdAt: -1 });
+dueSchema.index({ department: 1, status: 1, updatedAt: -1 });
+dueSchema.index({ university: 1, status: 1 });
+
 module.exports = mongoose.model('Due', dueSchema);
